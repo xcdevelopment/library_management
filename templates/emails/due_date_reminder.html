@@ -1,0 +1,40 @@
+<!-- templates/emails/due_date_reminder.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #F9A825; color: white; padding: 10px 20px; }
+        .content { padding: 20px; border: 1px solid #ddd; }
+        .footer { font-size: 12px; color: #777; margin-top: 20px; }
+        .reminder { color: #D32F2F; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>図書管理アプリ - 返却期限のお知らせ</h2>
+        </div>
+        <div class="content">
+            <p>{{ user.name }} 様</p>
+            <p>借りている本の返却期限が近づいています。</p>
+            <p class="reminder">返却期限まであと {{ days_remaining }} 日です。</p>
+            <h3>図書情報</h3>
+            <ul>
+                <li><strong>タイトル:</strong> {{ book.title }}</li>
+                <li><strong>著者:</strong> {{ book.author }}</li>
+                <li><strong>貸出日:</strong> {{ loan.loan_date.strftime('%Y年%m月%d日') }}</li>
+                <li><strong>返却期限:</strong> {{ loan.due_date.strftime('%Y年%m月%d日') }}</li>
+            </ul>
+            <p>期限内に返却をお願いいたします。</p>
+            <p><a href="{{ url_for('books.detail', id=book.id, _external=True) }}">図書の詳細を見る</a></p>
+        </div>
+        <div class="footer">
+            <p>このメールは自動送信されています。返信はできません。</p>
+            <p>&copy; 2025 図書管理アプリ</p>
+        </div>
+    </div>
+</body>
+</html>

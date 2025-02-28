@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}マイページ{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <h1 class="mb-4">マイページ</h1>
+    
+    <!-- ユーザー情報 -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h4 class="card-title mb-0">ユーザー情報</h4>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>ユーザー名:</strong> {{ user.username }}</p>
+                    <p><strong>氏名:</strong> {{ user.name }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>メールアドレス:</strong> {{ user.email or '未設定' }}</p>
+                    <p><strong>アカウント作成日:</strong> {{ user.created_at.strftime('%Y年%m月%d日') }}</p>
+                </div>
+            </div>
+            <div class="text-end">
+                <a href="{{ url_for('users.edit_profile') }}" class="btn btn-outline-primary">プロフィール編集</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 借りている本 -->
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h4 class="card-title mb-0">借りている本</h4>
+        </div>
+        <div class="card-body">
+            {% if borrowed_books %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>書籍名</th>
+                                <th>著者</th>
+                                <th>貸出日</th>
+                                <th>返却期限</th>
+                                <th>状態</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for book in borrowed_books %}
+                                {% set loan = book.loan_history|selectattr('return_date', 'none')|first %}
+                                <tr>
+                                    <td>{{ book.title }}</td>
+                                    <td>{{ book.author }}</td>
+                                    <td>{{ loan.loan_date.strftime('%Y/%m/%d') if loan else '不明' }}</td>
+                                    <td>
+                                        {% if loan and loan.due_date %}
+                                            {{ loan.due_date.strftime('%Y/%m/%d') }}
+                                            {% if loan.is_overdue() %}
+                                                <span class="badge bg-danger">期限超過</span>
+                                            {% elif loan.days_until_due() <= 3 %}
+                                                <span class="badge bg-warning text-dark">もうすぐ期限</span>
+                                            {% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if loan and loan.is_overdue() %}
+                                            <span class="text-danger">返却期限超過</span>
+                                        {% else %}
+                                            貸出中
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('books.return_book', book_id=book.id) }}" class="btn btn-sm btn-success">返却</a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted">現在借りている本はありません。</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- 予約状況 -->
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">
+            <h4 class="card-title mb-0">予約状況</h4>
+        </div>
+        <div class="card-body">
+            {% if reservations %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>書籍名</th>
+                                <th>予約日</th>
+                                <th>状態</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for reservation in reservations %}
+                                <tr>
+                                    <td>{{ reservation.book.title }}</td>
+                                    <td>{{ reservation.reservation_date.strftime('%Y/%m/%d') }}</td>
+                                    <td>
+                                        {% if reservation.status == 'pending' %}
+                                            <span class="badge bg-secondary">予約中</span>
+                                        {% elif reservation.status == 'notified' %}
+                                            <span class="badge bg-success">貸出可能</span>
+                                        {% elif reservation.status == 'completed' %}
+                                            <span class="badge bg-primary">貸出完了</span>
+                                        {% elif reservation.status == 'cancelled' %}
+                                            <span class="badge bg-danger">キャンセル</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if reservation.status in ['pending', 'notified'] %}
+                                            <a href="{{ url_for('books.cancel_reservation', reservation_id=reservation.id) }}" class="btn btn-sm btn-danger">キャンセル</a>
+                                            {% if reservation.status == 'notified' %}
+                                                <a href="{{ url_for('books.borrow_reserved', reservation_id=reservation.id) }}" class="btn btn-sm btn-primary">借りる</a>
+                                            {% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted">現在予約している本はありません。</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- 貸出履歴 -->
+    <div class="card">
+        <div class="card-header bg-secondary text-white">
+            <h4 class="card-title mb-0">貸出履歴</h4>
+        </div>
+        <div class="card-body">
+            {% if loan_history %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>書籍名</th>
+                                <th>貸出日</th>
+                                <th>返却日</th>
+                                <th>詳細</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for history in loan_history %}
+                                {% if history.return_date %}  <!-- 返却済みのもののみ表示 -->
+                                    <tr>
+                                        <td>{{ history.book_title }}</td>
+                                        <td>{{ history.loan_date.strftime('%Y/%m/%d') }}</td>
+                                        <td>{{ history.return_date.strftime('%Y/%m/%d') if history.return_date else '-' }}</td>
+                                        <td>
+                                            <a href="{{ url_for('books.detail', id=history.book_id) }}" class="btn btn-sm btn-outline-info">書籍詳細</a>
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted">貸出履歴はありません。</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}予約管理{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>{{ title }}</h1>
+
+    <!-- 統計情報 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h5 class="card-title">予約中</h5>
+                    <p class="card-text h2">{{ stats.pending }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h5 class="card-title">通知済み</h5>
+                    <p class="card-text h2">{{ stats.notified }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h5 class="card-title">完了</h5>
+                    <p class="card-text h2">{{ stats.completed }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-secondary">
+                <div class="card-body">
+                    <h5 class="card-title">キャンセル</h5>
+                    <p class="card-text h2">{{ stats.cancelled }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 予約一覧 -->
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">予約一覧</h5>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>書籍</th>
+                            <th>予約者</th>
+                            <th>予約日時</th>
+                            <th>状態</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for reservation in reservations %}
+                        <tr>
+                            <td>{{ reservation.id }}</td>
+                            <td>
+                                <a href="{{ url_for('books.detail', id=reservation.book_id) }}">
+                                    {{ reservation.book.title }}
+                                </a>
+                            </td>
+                            <td>{{ reservation.user.name }}</td>
+                            <td>{{ reservation.reservation_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                {% if reservation.status == 'pending' %}
+                                    <span class="badge bg-primary">予約中</span>
+                                {% elif reservation.status == 'notified' %}
+                                    <span class="badge bg-warning">通知済み</span>
+                                {% elif reservation.status == 'completed' %}
+                                    <span class="badge bg-success">完了</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">キャンセル</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if reservation.status == 'pending' %}
+                                    <form action="{{ url_for('reservations.notify_user', reservation_id=reservation.id) }}" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-warning btn-sm">通知</button>
+                                    </form>
+                                {% endif %}
+                                
+                                {% if reservation.status in ['pending', 'notified'] %}
+                                    <form action="{{ url_for('reservations.mark_completed', reservation_id=reservation.id) }}" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-success btn-sm">完了</button>
+                                    </form>
+                                    <form action="{{ url_for('reservations.cancel', reservation_id=reservation.id) }}?admin=1" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('この予約をキャンセルしてもよろしいですか？');">キャンセル</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ページネーション -->
+            {% if pagination.pages > 1 %}
+            <nav aria-label="Page navigation" class="mt-3">
+                <ul class="pagination justify-content-center">
+                    {% for page in pagination.iter_pages() %}
+                        {% if page %}
+                            <li class="page-item {% if page == pagination.page %}active{% endif %}">
+                                <a class="page-link" href="{{ url_for('reservations.admin', page=page) }}">{{ page }}</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">...</span>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

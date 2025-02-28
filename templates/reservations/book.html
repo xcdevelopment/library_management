@@ -1,0 +1,67 @@
+<!-- templates/reservations/book.html -->
+{% extends "base.html" %}
+
+{% block title %}予約一覧: {{ book.title }}{% endblock %}
+
+{% block heading %}予約一覧: {{ book.title }}{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{{ url_for('books.detail', id=book.id) }}" class="btn btn-outline-primary">
+        <i class="fas fa-arrow-left"></i> 書籍詳細に戻る
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">予約待ちリスト</h5>
+    </div>
+    <div class="card-body">
+        {% if reservations %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>順番</th>
+                            <th>予約日</th>
+                            <th>予約者</th>
+                            <th>状態</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for reservation in reservations %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>{{ reservation.reservation_date.strftime('%Y年%m月%d日') }}</td>
+                                <td>{{ reservation.user.name }}</td>
+                                <td>
+                                    {% if reservation.status == 'pending' %}
+                                        <span class="badge bg-info">予約中</span>
+                                    {% elif reservation.status == 'notified' %}
+                                        <span class="badge bg-success">通知済</span>
+                                        <small>
+                                            （{{ (reservation.reservation_date + timedelta(days=7)).strftime('%Y年%m月%d日') }}まで有効）
+                                        </small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form action="{{ url_for('reservations.cancel', id=reservation.id) }}?admin=1" method="POST" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('この予約をキャンセルしますか？')">
+                                            キャンセル
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                現在、予約待ちはありません。
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

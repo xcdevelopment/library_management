@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}{{ book.title }}{% endblock %}
+
+{% block heading %}{{ book.title }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">図書情報</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-3"><strong>著者</strong></div>
+                    <div class="col-md-9">{{ book.author or '未設定' }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3"><strong>第１分類</strong></div>
+                    <div class="col-md-9">{{ book.category1 or '未設定' }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3"><strong>第２分類</strong></div>
+                    <div class="col-md-9">{{ book.category2 or '未設定' }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3"><strong>キーワード</strong></div>
+                    <div class="col-md-9">{{ book.keywords or '未設定' }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3"><strong>場所</strong></div>
+                    <div class="col-md-9">{{ book.location or '未設定' }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3"><strong>貸出状況</strong></div>
+                    <div class="col-md-9">
+                        {% if book.is_available %}
+                            <span class="badge bg-success">貸出可能</span>
+                        {% else %}
+                            <span class="badge bg-danger">貸出中</span>
+                            <span>（{{ book.borrower.name }} さんが借りています）</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- 予約情報表示 -->
+                {% if reservations %}
+                <div class="row mb-3">
+                    <div class="col-md-3"><strong>予約状況</strong></div>
+                    <div class="col-md-9">
+                        <span class="badge bg-warning text-dark">予約 {{ reservations|length }}件</span>
+                        {% if is_admin %}
+                        <a href="{{ url_for('reservations.book_reservations', book_id=book.id) }}" class="btn btn-sm btn-outline-secondary">
+                            予約一覧を見る
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- 自分の予約状況 -->
+                {% if user_reservation %}
+                <div class="row mb-3">
+                    <div class="col-md-3"><strong>あなたの予約</strong></div>
+                    <div class="col-md-9">
+                        {% if user_reservation.status == 'pending' %}
+                            <span class="badge bg-info">予約中</span> （予約日: {{ user_reservation.reservation_date.strftime('%Y年%m月%d日') }}）
+                        {% elif user_reservation.status == 'notified' %}
+                            <span class="badge bg-success">貸出可能</span> （{{ (user_reservation.reservation_date + timedelta(days=7)).strftime('%Y年%m月%d日') }}まで予約保持）
+                        {% endif %}
+                        
+                        <form action="{{ url_for('reservations.cancel', id=user_reservation.id) }}" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('予約をキャンセルしますか？')">
+                                予約キャンセル
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- 貸出・返却ボタン -->
+        <div class="mb-4">
+            {% if book.is_available %}
+                <form action="{{ url_for('books.checkout', id=book.id) }}" method="POST" class="d-inline">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-hand-holding"></i> 借りる
+                    </button>
+                </form>
+            {% else %}
+                {% if book.borrower_id == current_user.id or is_admin %}
+                    <form action="{{ url_for('books.return_book_route', id=book.id) }}" method="POST" class="d-inline">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-undo"></i> 返却する
+                        </button>
+                    </form>
+                {% elif not user_reservation %}
+                    <!-- 予約フォーム -->
+                    <form action="{{ url_for('reservations.create', book_id=book.id) }}" method="POST" class="d-inline">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-bookmark"></i> 予約する
+                        </button>
+                    </form>
+                {% endif %}
+            {% endif %}
+            
+            {% if is_admin %}
+                <a href="{{ url_for('books.edit', id=book.id) }}" class="btn btn-outline-primary">
+                    <i class="fas fa-edit"></i> 編集
+                </a>
+            {% endif %}
+            
+            <a href="{{ url_for('books.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> 一覧に戻る
+            </a>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- 貸出履歴 -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">貸出履歴</h5>
+            </div>
+            <div class="card-body">
+                {% if history %}
+                    <ul class="list-group list-group-flush">
+                    {% for h in history %}
+                        <li class="list-group-item">
+                            <div><strong>{{ h.borrower.name }}</strong></div>
+                            <div>貸出日: {{ h.loan_date.strftime('%Y年%m月%d日') }}</div>
+                            {% if h.due_date %}
+                            <div>返却期限: {{ h.due_date.strftime('%Y年%m月%d日') }}</div>
+                            {% endif %}
+                            {% if h.return_date %}
+                                <div>返却日: {{ h.return_date.strftime('%Y年%m月%d日') }}</div>
+                                <span class="badge bg-success">返却済</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">貸出中</span>
+                                {% if h.is_overdue() %}
+                                    <span class="badge bg-danger">期限超過</span>
+                                {% endif %}
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted">貸出履歴はありません。</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

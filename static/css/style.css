@@ -1,0 +1,57 @@
+/* 全体のスタイル */
+body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background-color: #f5f5f5;
+}
+
+/* ヘッダーのスタイル */
+.navbar-brand {
+    font-weight: bold;
+}
+
+/* メインコンテンツのスタイル */
+main {
+    min-height: calc(100vh - 180px);
+}
+
+/* フッターのスタイル */
+footer {
+    margin-top: 2rem;
+}
+
+/* カードのスタイル */
+.card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    font-weight: bold;
+}
+
+/* フォームのスタイル */
+.form-label {
+    font-weight: 500;
+}
+
+/* テーブルのスタイル */
+.table th {
+    background-color: #f8f9fa;
+}
+
+/* ページタイトルのスタイル */
+h1 {
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* アラートのスタイル */
+.alert {
+    margin-bottom: 1.5rem;
+}
+
+/* バッジのスタイル */
+.badge {
+    font-size: 0.85rem;
+}

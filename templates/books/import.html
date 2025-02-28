@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}書籍一括インポート{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="card-title mb-0">書籍一括インポート</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        {{ form.csrf_token }}
+                        
+                        <div class="mb-3">
+                            {{ form.file.label(class="form-label") }}
+                            {{ form.file(class="form-control") }}
+                            {% if form.file.errors %}
+                                {% for error in form.file.errors %}
+                                    <div class="text-danger">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <h5>CSVファイルの形式</h5>
+                            <p class="mb-2">以下の列を含むCSVファイルをアップロードしてください：</p>
+                            <ul class="mb-0">
+                                <li>title（書籍名）: 必須</li>
+                                <li>author（著者）: 任意</li>
+                                <li>category1（第1分類）: 任意</li>
+                                <li>category2（第2分類）: 任意</li>
+                                <li>keywords（キーワード）: 任意</li>
+                                <li>location（場所）: 任意</li>
+                                <li>is_available（貸出可否）: 任意（true/false）</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="text-end">
+                            <a href="{{ url_for('books.index') }}" class="btn btn-secondary me-2">キャンセル</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-file-import me-1"></i> インポート
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

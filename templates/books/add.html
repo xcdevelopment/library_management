@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}書籍登録{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">書籍登録</h1>
+    
+    <form method="POST" action="{{ url_for('books.add') }}">
+        {{ form.hidden_tag() }}
+        
+        <div class="row mb-3">
+            <div class="col-md-8">
+                <div class="form-group mb-3">
+                    <label for="title">書籍名 <span class="text-danger">*</span></label>
+                    {{ form.title(class="form-control", placeholder="書籍名を入力してください") }}
+                    {% if form.title.errors %}
+                        <div class="text-danger">
+                            {% for error in form.title.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label for="author">著者</label>
+                    {{ form.author(class="form-control", placeholder="著者名を入力してください") }}
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group mb-3">
+                            <label for="category1">第1分類</label>
+                            {{ form.category1(class="form-control") }}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group mb-3">
+                            <label for="category2">第2分類</label>
+                            {{ form.category2(class="form-control") }}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label for="keywords">キーワード</label>
+                    {{ form.keywords(class="form-control", placeholder="複数のキーワードはカンマで区切ってください") }}
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label for="location">場所</label>
+                    {{ form.location(class="form-control", placeholder="書籍の保管場所を入力してください") }}
+                </div>
+                
+                <div class="form-check mb-3">
+                    {{ form.is_available(class="form-check-input") }}
+                    <label class="form-check-label" for="is_available">貸出可能</label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <button type="submit" class="btn btn-primary">登録する</button>
+            <a href="{{ url_for('books.index') }}" class="btn btn-secondary">キャンセル</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

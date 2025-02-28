@@ -1,0 +1,19 @@
+<!-- templates/emails/reservation_available.txt -->
+図書管理アプリ - 予約本のお知らせ
+
+{{ user.name }} 様
+
+予約していた本が利用可能になりました。
+
+■ 図書情報
+タイトル: {{ book.title }}
+著者: {{ book.author }}
+場所: {{ book.location }}
+
+図書は7日間予約が保持されます。この期間内にご来館の上、貸出手続きを行ってください。
+
+図書の詳細を見る: {{ url_for('books.detail', id=book.id, _external=True) }}
+
+---
+このメールは自動送信されています。返信はできません。
+© 2025 図書管理アプリ

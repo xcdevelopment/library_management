@@ -1,0 +1,21 @@
+<!-- templates/emails/due_date_reminder.txt -->
+図書管理アプリ - 返却期限のお知らせ
+
+{{ user.name }} 様
+
+借りている本の返却期限が近づいています。
+返却期限まであと {{ days_remaining }} 日です。
+
+■ 図書情報
+タイトル: {{ book.title }}
+著者: {{ book.author }}
+貸出日: {{ loan.loan_date.strftime('%Y年%m月%d日') }}
+返却期限: {{ loan.due_date.strftime('%Y年%m月%d日') }}
+
+期限内に返却をお願いいたします。
+
+図書の詳細を見る: {{ url_for('books.detail', id=book.id, _external=True) }}
+
+---
+このメールは自動送信されています。返信はできません。
+© 2025 図書管理アプリ
