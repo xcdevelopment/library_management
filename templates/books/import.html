@@ -3,51 +3,86 @@
 {% block title %}書籍一括インポート{% endblock %}
 
 {% block content %}
-<div class="container my-4">
-    <div class="row">
-        <div class="col-md-8 offset-md-2">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="card-title mb-0">書籍一括インポート</h4>
-                </div>
-                <div class="card-body">
-                    <form method="POST" enctype="multipart/form-data">
-                        {{ form.csrf_token }}
-                        
-                        <div class="mb-3">
-                            {{ form.file.label(class="form-label") }}
-                            {{ form.file(class="form-control") }}
-                            {% if form.file.errors %}
-                                {% for error in form.file.errors %}
-                                    <div class="text-danger">{{ error }}</div>
-                                {% endfor %}
-                            {% endif %}
-                        </div>
-                        
-                        <div class="alert alert-info">
-                            <h5>CSVファイルの形式</h5>
-                            <p class="mb-2">以下の列を含むCSVファイルをアップロードしてください：</p>
-                            <ul class="mb-0">
-                                <li>title（書籍名）: 必須</li>
-                                <li>author（著者）: 任意</li>
-                                <li>category1（第1分類）: 任意</li>
-                                <li>category2（第2分類）: 任意</li>
-                                <li>keywords（キーワード）: 任意</li>
-                                <li>location（場所）: 任意</li>
-                                <li>is_available（貸出可否）: 任意（true/false）</li>
-                            </ul>
-                        </div>
-                        
-                        <div class="text-end">
-                            <a href="{{ url_for('books.index') }}" class="btn btn-secondary me-2">キャンセル</a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-file-import me-1"></i> インポート
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
+<div class="container">
+    <h2 class="mb-4">書籍一括インポート</h2>
+
+    <div class="card">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">CSVファイルをアップロード</h5>
         </div>
+        <div class="card-body">
+            <form method="POST" enctype="multipart/form-data">
+                <div class="mb-4">
+                    <h6>CSVファイルの形式</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>列名</th>
+                                    <th>説明</th>
+                                    <th>必須</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>title</td>
+                                    <td>書籍名</td>
+                                    <td>○</td>
+                                </tr>
+                                <tr>
+                                    <td>author</td>
+                                    <td>著者</td>
+                                    <td>-</td>
+                                </tr>
+                                <tr>
+                                    <td>category1</td>
+                                    <td>第１分類</td>
+                                    <td>-</td>
+                                </tr>
+                                <tr>
+                                    <td>category2</td>
+                                    <td>第２分類</td>
+                                    <td>-</td>
+                                </tr>
+                                <tr>
+                                    <td>keywords</td>
+                                    <td>キーワード（カンマ区切り）</td>
+                                    <td>-</td>
+                                </tr>
+                                <tr>
+                                    <td>location</td>
+                                    <td>配置場所</td>
+                                    <td>-</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <h6>サンプルCSV</h6>
+                    <pre class="bg-light p-3 rounded"><code>title,author,category1,category2,keywords,location
+経営の基本,山田太郎,経営･マネジメント,経営戦略・リーダーシップ,経営戦略;リーダーシップ,B1-1
+財務会計入門,鈴木一郎,会計･ファイナンス,会計基礎・簿記,会計;簿記,B1-2</code></pre>
+                </div>
+
+                <div class="mb-4">
+                    <div class="input-group">
+                        <input type="file" class="form-control" name="file" accept=".csv" required>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload"></i> インポート
+                        </button>
+                    </div>
+                    <div class="form-text">CSVファイル（UTF-8エンコード）を選択してください。</div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <a href="{{ url_for('books.index') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> 書籍一覧に戻る
+        </a>
     </div>
 </div>
 {% endblock %}

@@ -3,67 +3,124 @@
 {% block title %}書籍登録{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h1 class="mb-4">書籍登録</h1>
-    
-    <form method="POST" action="{{ url_for('books.add') }}">
-        {{ form.hidden_tag() }}
-        
-        <div class="row mb-3">
-            <div class="col-md-8">
-                <div class="form-group mb-3">
-                    <label for="title">書籍名 <span class="text-danger">*</span></label>
-                    {{ form.title(class="form-control", placeholder="書籍名を入力してください") }}
-                    {% if form.title.errors %}
-                        <div class="text-danger">
-                            {% for error in form.title.errors %}
-                                {{ error }}
-                            {% endfor %}
-                        </div>
+<div class="card">
+    <div class="card-header bg-light">
+        <h5 class="mb-0">書籍登録</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('books.add') }}">
+            {{ form.hidden_tag() }}
+            
+            <div class="mb-3">
+                {{ form.title.label(class="form-label") }}
+                {{ form.title(class="form-control") }}
+                {% if form.title.errors %}
+                <div class="invalid-feedback d-block">
+                    {% for error in form.title.errors %}
+                    <span>{{ error }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="mb-3">
+                {{ form.author.label(class="form-label") }}
+                {{ form.author(class="form-control") }}
+                {% if form.author.errors %}
+                <div class="invalid-feedback d-block">
+                    {% for error in form.author.errors %}
+                    <span>{{ error }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    {{ form.category1.label(class="form-label") }}
+                    {{ form.category1(class="form-select") }}
+                    {% if form.category1.errors %}
+                    <div class="invalid-feedback d-block">
+                        {% for error in form.category1.errors %}
+                        <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
                     {% endif %}
                 </div>
-                
-                <div class="form-group mb-3">
-                    <label for="author">著者</label>
-                    {{ form.author(class="form-control", placeholder="著者名を入力してください") }}
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group mb-3">
-                            <label for="category1">第1分類</label>
-                            {{ form.category1(class="form-control") }}
-                        </div>
+
+                <div class="col-md-6 mb-3">
+                    {{ form.category2.label(class="form-label") }}
+                    {{ form.category2(class="form-select") }}
+                    {% if form.category2.errors %}
+                    <div class="invalid-feedback d-block">
+                        {% for error in form.category2.errors %}
+                        <span>{{ error }}</span>
+                        {% endfor %}
                     </div>
-                    <div class="col-md-6">
-                        <div class="form-group mb-3">
-                            <label for="category2">第2分類</label>
-                            {{ form.category2(class="form-control") }}
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="form-group mb-3">
-                    <label for="keywords">キーワード</label>
-                    {{ form.keywords(class="form-control", placeholder="複数のキーワードはカンマで区切ってください") }}
-                </div>
-                
-                <div class="form-group mb-3">
-                    <label for="location">場所</label>
-                    {{ form.location(class="form-control", placeholder="書籍の保管場所を入力してください") }}
-                </div>
-                
-                <div class="form-check mb-3">
-                    {{ form.is_available(class="form-check-input") }}
-                    <label class="form-check-label" for="is_available">貸出可能</label>
+                    {% endif %}
                 </div>
             </div>
-        </div>
-        
-        <div class="form-group">
-            <button type="submit" class="btn btn-primary">登録する</button>
-            <a href="{{ url_for('books.index') }}" class="btn btn-secondary">キャンセル</a>
-        </div>
-    </form>
+
+            <div class="mb-3">
+                {{ form.keywords.label(class="form-label") }}
+                {{ form.keywords(class="form-control") }}
+                <div class="form-text">複数のキーワードはカンマ（,）で区切ってください</div>
+            </div>
+
+            <div class="mb-3">
+                {{ form.location.label(class="form-label") }}
+                {{ form.location(class="form-control") }}
+            </div>
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <a href="{{ url_for('books.index') }}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> キャンセル
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> 登録
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+// 分類の定義
+const CATEGORIES = {{ categories|tojson }};
+
+// 第2分類の選択肢を更新する関数
+function updateCategory2Options() {
+    const category1Select = document.getElementById('category1');
+    const category2Select = document.getElementById('category2');
+    const selectedCategory1 = category1Select.value;
+    
+    // 現在の選択肢をクリア
+    category2Select.innerHTML = '';
+    
+    // デフォルトの選択肢を追加
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.text = '選択してください';
+    category2Select.appendChild(defaultOption);
+    
+    // 選択された第1分類に基づいて第2分類の選択肢を追加
+    if (selectedCategory1 && CATEGORIES[selectedCategory1]) {
+        CATEGORIES[selectedCategory1].forEach(([value, text]) => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.text = text;
+            category2Select.appendChild(option);
+        });
+    }
+}
+
+// 第1分類が変更されたときのイベントリスナーを設定
+document.getElementById('category1').addEventListener('change', updateCategory2Options);
+
+// ページ読み込み時に初期化
+document.addEventListener('DOMContentLoaded', updateCategory2Options);
+</script>
 {% endblock %}

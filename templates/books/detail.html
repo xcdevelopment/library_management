@@ -84,14 +84,14 @@
         <!-- 貸出・返却ボタン -->
         <div class="mb-4">
             {% if book.is_available %}
-                <form action="{{ url_for('books.checkout', id=book.id) }}" method="POST" class="d-inline">
+                <form action="{{ url_for('books.borrow', book_id=book.id) }}" method="POST" class="d-inline">
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-hand-holding"></i> 借りる
                     </button>
                 </form>
             {% else %}
                 {% if book.borrower_id == current_user.id or is_admin %}
-                    <form action="{{ url_for('books.return_book_route', id=book.id) }}" method="POST" class="d-inline">
+                    <form action="{{ url_for('books.return_book_route', book_id=book.id) }}" method="POST" class="d-inline">
                         <button type="submit" class="btn btn-success">
                             <i class="fas fa-undo"></i> 返却する
                         </button>

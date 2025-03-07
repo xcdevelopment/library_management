@@ -22,7 +22,7 @@ class BookForm(FlaskForm):
         Length(max=200, message='キーワードは200文字以内で入力してください')
     ])
     location = StringField('場所', validators=[
-        Length(max=100, message='場所は100文字以内で入力してください')
+        Length(max=50, message='場所は50文字以内で入力してください')
     ])
     is_available = BooleanField('貸出可能')
 

@@ -91,7 +91,7 @@
                                     <form action="{{ url_for('reservations.mark_completed', reservation_id=reservation.id) }}" method="post" class="d-inline">
                                         <button type="submit" class="btn btn-success btn-sm">完了</button>
                                     </form>
-                                    <form action="{{ url_for('reservations.cancel', reservation_id=reservation.id) }}?admin=1" method="post" class="d-inline">
+                                    <form action="{{ url_for('reservations.cancel', reservation_id=reservation.id) }}?admin=1" method="POST" class="d-inline">
                                         <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('この予約をキャンセルしてもよろしいですか？');">キャンセル</button>
                                     </form>
                                 {% endif %}

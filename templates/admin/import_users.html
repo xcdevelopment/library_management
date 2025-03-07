@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}ユーザー一括インポート{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="mb-0">ユーザー一括インポート</h2>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="mb-4">
+                            <h5>CSVファイル形式</h5>
+                            <p>以下の列を含むCSVファイルをアップロードしてください：</p>
+                            <ul>
+                                <li><strong>username</strong>: ユーザー名（必須）</li>
+                                <li><strong>password</strong>: パスワード（必須）</li>
+                                <li><strong>name</strong>: 氏名（必須）</li>
+                                <li><strong>email</strong>: メールアドレス（任意）</li>
+                                <li><strong>is_admin</strong>: 管理者権限（任意、true/false）</li>
+                            </ul>
+                            <p>CSVファイルの例：</p>
+                            <pre class="bg-light p-2">username,password,name,email,is_admin
+user1,pass123,山田太郎,yamada@example.com,false
+user2,pass456,鈴木花子,suzuki@example.com,true</pre>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="file" class="form-label">CSVファイル</label>
+                            <input type="file" class="form-control" id="file" name="file" accept=".csv" required>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-file-import"></i> インポート
+                            </button>
+                            <a href="{{ url_for('admin.user_list') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> ユーザー一覧に戻る
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

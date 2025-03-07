@@ -46,7 +46,7 @@
                                 </td>
                                 <td>
                                     {% if reservation.status in ['pending', 'notified'] %}
-                                        <form action="{{ url_for('reservations.cancel', id=reservation.id) }}" method="POST" class="d-inline">
+                                        <form action="{{ url_for('reservations.cancel', reservation_id=reservation.id) }}" method="POST" class="d-inline">
                                             <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('予約をキャンセルしますか？')">
                                                 キャンセル
                                             </button>
@@ -138,7 +138,7 @@
                                 </td>
                                 <td>
                                     {% if reservation.status in ['pending', 'notified'] %}
-                                        <form action="{{ url_for('reservations.cancel', id=reservation.id) }}?admin=1" method="POST" class="d-inline">
+                                        <form action="{{ url_for('reservations.cancel', reservation_id=reservation.id) }}?admin=1" method="POST" class="d-inline">
                                             <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('この予約をキャンセルしますか？')">
                                                 キャンセル
                                             </button>
@@ -207,7 +207,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <form action="{{ url_for('reservations.cancel', id=reservation.id) }}?admin=1" method="POST" class="d-inline">
+                                    <form action="{{ url_for('reservations.cancel', reservation_id=reservation.id) }}" method="POST" class="d-inline">
                                         <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('この予約をキャンセルしますか？')">
                                             キャンセル
                                         </button>

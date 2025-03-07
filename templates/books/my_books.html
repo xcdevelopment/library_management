@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}マイ書籍{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">マイ書籍</h2>
+
+<!-- 貸出中の書籍 -->
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <h5 class="mb-0">貸出中の書籍</h5>
+    </div>
+    <div class="card-body">
+        {% if borrowed_books %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>書籍名</th>
+                        <th>著者</th>
+                        <th>貸出日</th>
+                        <th>返却期限</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for book in borrowed_books %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('books.book_detail', book_id=book.id) }}">
+                                {{ book.title }}
+                            </a>
+                        </td>
+                        <td>{{ book.author }}</td>
+                        <td>{{ book.current_loan.loan_date.strftime('%Y/%m/%d') }}</td>
+                        <td>{{ book.current_loan.due_date.strftime('%Y/%m/%d') }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('books.return_book_route', book_id=book.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-success">
+                                    <i class="fas fa-undo"></i> 返却
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> 現在借りている書籍はありません。
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 予約中の書籍 -->
+<div class="card">
+    <div class="card-header bg-light">
+        <h5 class="mb-0">予約中の書籍</h5>
+    </div>
+    <div class="card-body">
+        {% if reservations %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>書籍名</th>
+                        <th>著者</th>
+                        <th>予約日</th>
+                        <th>予約順</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for reservation in reservations %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('books.book_detail', book_id=reservation.book.id) }}">
+                                {{ reservation.book.title }}
+                            </a>
+                        </td>
+                        <td>{{ reservation.book.author }}</td>
+                        <td>{{ reservation.reservation_date.strftime('%Y/%m/%d') }}</td>
+                        <td>{{ reservation.queue_position }}番目</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('books.cancel', reservation_id=reservation.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="fas fa-times"></i> キャンセル
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> 現在予約している書籍はありません。
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('books.index') }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> 書籍一覧に戻る
+    </a>
+</div>
+{% endblock %} 
