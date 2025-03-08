@@ -152,8 +152,8 @@ def return_book_route(book_id):
         next_reservation.status = ReservationStatus.NOTIFIED
         next_reservation.notification_sent = True
         
-        # メール通知
-        send_book_available_notification(next_reservation.user, book)
+        # メール通知を一時的に無効化
+        # send_book_available_notification(next_reservation.user, book)
         
         # 書籍の状態を予約済みに更新
         book.status = BookStatus.RESERVED

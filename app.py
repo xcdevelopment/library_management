@@ -5,11 +5,12 @@ from flask_migrate import Migrate
 from flask_talisman import Talisman
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from utils.email import mail
+from flask_cors import CORS
 import os
 import sys
 import logging
 from logging.handlers import RotatingFileHandler
+from flask_sqlalchemy import SQLAlchemy
 
 # カレントディレクトリをパスに追加
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
@@ -27,6 +28,9 @@ def create_app(config_name='default'):
     """アプリケーションファクトリ"""
     app = Flask(__name__)
     
+    # CORS設定の追加
+    CORS(app)
+    
     # 設定の読み込み
     app.config.from_object(config[config_name])
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -42,18 +46,9 @@ def create_app(config_name='default'):
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1時間
     
-    # メール設定
-    app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-    app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', '587'))
-    app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
-    app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
-    app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
-    app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', 'noreply@example.com')
-    
     # データベース初期化
     db.init_app(app)
     migrate = Migrate(app, db)
-    mail.init_app(app)
     
     # ログインマネージャー設定
     login_manager = LoginManager()

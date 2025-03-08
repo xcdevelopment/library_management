@@ -1,16 +1,19 @@
 # config.py
 import os
 from datetime import timedelta
+from dotenv import load_dotenv
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
+load_dotenv()
+
 class Config:
     """基本設定"""
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'hard-to-guess-string'
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     PERMANENT_SESSION_LIFETIME = timedelta(hours=2)  # セッション有効期限
     
-    # アップロードフォルダの設定を追加
+    # アップロードフォルダの設定
     UPLOAD_FOLDER = os.path.join(basedir, 'uploads')
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 最大アップロードサイズ: 16MB
     
