@@ -12,7 +12,6 @@ from models import Book, LoanHistory, Reservation, OperationLog, db, User, Reser
 from services.book_service import borrow_book, return_book, reserve_book, cancel_reservation
 from forms.search import SearchForm
 from forms.book import BookForm, CATEGORIES
-from utils.email import send_book_available_notification
 
 books_bp = Blueprint('books', __name__, url_prefix='/books')
 

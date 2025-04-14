@@ -26,7 +26,9 @@ from config import config
 
 def create_app(config_name='default'):
     """アプリケーションファクトリ"""
-    app = Flask(__name__)
+    app = Flask(__name__, 
+              template_folder='templates',
+              static_folder='static')
     
     # CORS設定の追加
     CORS(app)
@@ -39,6 +41,12 @@ def create_app(config_name='default'):
         'pool_recycle': 3600,
         'pool_pre_ping': True
     }
+    
+    # デバッグモードの設定
+    app.config['DEBUG'] = True
+    
+    # テンプレート自動リロードの有効化
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
     
     # セッション設定
     app.config['SESSION_COOKIE_SECURE'] = True
@@ -134,6 +142,12 @@ def create_app(config_name='default'):
         db.session.rollback()
         app.logger.error(f'Server Error: {e}')
         return render_template('500.html'), 500
+    
+    @app.before_request
+    def before_request():
+        if not request.is_secure and not app.debug:
+            url = request.url.replace('http://', 'https://', 1)
+            return redirect(url, code=301)
     
     return app
 

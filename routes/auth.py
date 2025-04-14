@@ -4,6 +4,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from urllib.parse import urlparse
 
 from models import User, db, OperationLog
+from forms.auth import LoginForm, SignupForm
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
@@ -13,18 +14,15 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('books.index'))
         
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        remember = 'remember' in request.form
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(username=form.username.data).first()
         
-        user = User.query.filter_by(username=username).first()
-        
-        if user is None or not user.check_password(password):
+        if user is None or not user.check_password(form.password.data):
             flash('ユーザー名またはパスワードが正しくありません。', 'danger')
-            return render_template('auth/login.html')
+            return render_template('auth/login.html', form=form)
             
-        login_user(user, remember=remember)
+        login_user(user, remember=form.remember_me.data)
         
         # 操作ログの記録
         log = OperationLog(
@@ -43,7 +41,7 @@ def login():
             
         return redirect(next_page)
         
-    return render_template('auth/login.html')
+    return render_template('auth/login.html', form=form)
 
 @auth_bp.route('/logout')
 @login_required
@@ -63,3 +61,38 @@ def logout():
     logout_user()
     flash('ログアウトしました。', 'info')
     return redirect(url_for('auth.login'))
+
+@auth_bp.route('/signup', methods=['GET', 'POST'])
+def signup():
+    """サインアップ処理"""
+    if current_user.is_authenticated:
+        return redirect(url_for('books.index'))
+    
+    form = SignupForm()
+    if form.validate_on_submit():
+        # ユーザー作成
+        user = User(
+            username=form.username.data,
+            name=form.name.data,
+            email=form.email.data
+        )
+        user.set_password(form.password.data)
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        # 操作ログの記録
+        log = OperationLog(
+            user_id=user.id,
+            action='signup',
+            target=f'User: {user.username}',
+            details=f'New user registered: {user.username}',
+            ip_address=request.remote_addr
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        flash('ユーザー登録が完了しました。ログインしてください。', 'success')
+        return redirect(url_for('auth.login'))
+        
+    return render_template('auth/signup.html', form=form)
