@@ -12,7 +12,7 @@
                     <h3 class="text-center">ユーザー登録</h3>
                 </div>
                 <div class="card-body">
-                    {{ wtf.quick_form(form) }}
+                    {{ wtf.quick_form(form, button_map={'submit': 'primary'}) }}
                     <p class="mt-3 text-center">
                         アカウントをお持ちですか？ <a href="{{ url_for('auth.login') }}">ログイン</a>
                     </p>

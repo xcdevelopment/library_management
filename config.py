@@ -36,8 +36,10 @@ class TestingConfig(Config):
 
 class ProductionConfig(Config):
     """本番環境設定"""
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'sqlite:///' + os.path.join(basedir, 'library.db')
+    # 環境変数に頼らず、常に絶対パスを指定する
+    SQLALCHEMY_DATABASE_URI = 'sqlite:////home/xcdevelopment/library_management/library.db'
+    # os.environ.get('DATABASE_URL') or \
+    #'sqlite:///' + os.path.join(basedir, 'library.db') # 元のコードをコメントアウト
 
 # 環境設定辞書
 config = {

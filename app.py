@@ -6,11 +6,14 @@ from flask_talisman import Talisman
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
+from flask_bootstrap import Bootstrap
 import os
 import sys
 import logging
 from logging.handlers import RotatingFileHandler
 from flask_sqlalchemy import SQLAlchemy
+from flask.cli import with_appcontext
+import click
 
 # カレントディレクトリをパスに追加
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
@@ -24,8 +27,78 @@ from routes.reservations import reservations_bp
 from utils.logger import setup_logger
 from config import config
 
-def create_app(config_name='default'):
+@click.command('init-db')
+@with_appcontext
+def init_db_command():
+    """データベースを初期化し、初期管理者ユーザーを作成します。"""
+    db.create_all()
+    # 初期管理者ユーザーの作成
+    if not User.query.filter_by(username='admin').first():
+        admin = User(username='admin', name='管理者', is_admin=True)
+        # 環境変数 ADMIN_PASSWORD を取得、なければデフォルト値を使用
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'change_me_immediately')
+        admin.set_password(admin_password)
+        db.session.add(admin)
+        db.session.commit()
+        print(f'Initialized the database and created the admin user with password: {admin_password}')
+
+        # 操作ログの記録 (requestオブジェクトがないためIPアドレスは'localhost'とする)
+        # init-db実行時にはまだadmin.idが決まっていない可能性があるので注意 -> commit後に取得
+        admin = User.query.filter_by(username='admin').first() # commit後に再度取得
+        if admin:
+            log = OperationLog(
+                user_id=admin.id,
+                action='user_created',
+                target='Initial admin user',
+                ip_address='localhost' # CLIからの実行を示す
+            )
+            db.session.add(log)
+            db.session.commit()
+    else:
+        print('Admin user already exists.')
+
+@click.command('reset-admin-password')
+@with_appcontext
+def reset_admin_password_command():
+    """管理者(admin)のパスワードを環境変数 ADMIN_PASSWORD の値でリセットします。"""
+    admin_user = User.query.filter_by(username='admin').first()
+    if not admin_user:
+        print("Error: Admin user 'admin' not found.")
+        return
+
+    admin_password = os.environ.get('ADMIN_PASSWORD')
+    if not admin_password:
+        print("Error: ADMIN_PASSWORD environment variable is not set.")
+        print("Please set the ADMIN_PASSWORD environment variable and try again.")
+        return
+
+    try:
+        admin_user.set_password(admin_password)
+        db.session.add(admin_user) # オブジェクトが変更されたのでセッションに追加
+        db.session.commit()
+        print(f"Admin user 'admin' password has been reset using the ADMIN_PASSWORD environment variable.")
+
+        # 必要であれば操作ログを記録
+        log = OperationLog(
+            user_id=admin_user.id,
+            action='admin_password_reset',
+            target=f'User: {admin_user.username}',
+            details='Admin password reset via CLI command.',
+            ip_address='localhost' # CLIからの実行を示す
+        )
+        db.session.add(log)
+        db.session.commit()
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error resetting admin password: {e}")
+
+def create_app(config_name=None):
     """アプリケーションファクトリ"""
+    # FLASK_ENV から設定名を決定、未設定なら 'default' を使う
+    if config_name is None:
+        config_name = os.environ.get('FLASK_ENV', 'default')
+
     app = Flask(__name__, 
               template_folder='templates',
               static_folder='static')
@@ -33,14 +106,29 @@ def create_app(config_name='default'):
     # CORS設定の追加
     CORS(app)
     
-    # 設定の読み込み
-    app.config.from_object(config[config_name])
+    # 決定した設定名で設定を読み込む
+    try:
+        app.config.from_object(config[config_name])
+    except KeyError:
+        print(f"Error: Invalid config name '{config_name}'. Using 'default' config instead.")
+        config_name = 'default'
+        app.config.from_object(config[config_name])
+
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'pool_size': 10,
         'pool_recycle': 3600,
         'pool_pre_ping': True
     }
+    
+    # ★★★ デバッグ用ログ変更 ★★★
+    db_uri = app.config.get('SQLALCHEMY_DATABASE_URI')
+    log_message = (
+        f"!!! DEBUG: Using config '{config_name}'. "
+        f"SQLALCHEMY_DATABASE_URI = {db_uri}"
+    )
+    print(log_message) # print も念のため追加
+    # ★★★★★★★★★★★★★★★★★★
     
     # デバッグモードの設定
     app.config['DEBUG'] = True
@@ -56,13 +144,14 @@ def create_app(config_name='default'):
     
     # データベース初期化
     db.init_app(app)
+    Bootstrap(app)
     migrate = Migrate(app, db)
     
     # ログインマネージャー設定
     login_manager = LoginManager()
     login_manager.init_app(app)
     login_manager.login_view = 'auth.login'
-    login_manager.login_message = 'ログインしてください。'
+    
     login_manager.session_protection = 'strong'
     
     @login_manager.user_loader
@@ -149,28 +238,8 @@ def create_app(config_name='default'):
             url = request.url.replace('http://', 'https://', 1)
             return redirect(url, code=301)
     
-    return app
+    # Flask CLI コマンドの登録
+    app.cli.add_command(init_db_command)
+    app.cli.add_command(reset_admin_password_command)
 
-if __name__ == '__main__':
-    app = create_app()
-    with app.app_context():
-        db.create_all()
-        
-        # 初期管理者ユーザーの作成
-        if not User.query.filter_by(username='admin').first():
-            admin = User(username='admin', name='管理者', is_admin=True)
-            admin.set_password(os.environ.get('ADMIN_PASSWORD', 'change_me_immediately'))
-            db.session.add(admin)
-            db.session.commit()
-            
-            # 操作ログの記録
-            log = OperationLog(
-                user_id=admin.id,
-                action='user_created',
-                target='Initial admin user',
-                ip_address=request.remote_addr if request else 'localhost'
-            )
-            db.session.add(log)
-            db.session.commit()
-    
-    app.run(debug=True)
+    return app
