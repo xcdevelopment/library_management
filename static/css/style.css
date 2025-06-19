@@ -55,3 +55,28 @@ h1 {
 .badge {
     font-size: 0.85rem;
 }
+
+/* Books table layout adjustments */
+.table th:nth-child(1), .table td:nth-child(1) { /* Title */
+    width: 40%;
+}
+.table th:nth-child(2), .table td:nth-child(2) { /* Author */
+    width: 15%;
+}
+.table th:nth-child(3), .table td:nth-child(3) { /* Category */
+    width: 15%;
+}
+.table th:nth-child(4), .table td:nth-child(4) { /* Location */
+    width: 10%;
+}
+.table th:nth-child(5), .table td:nth-child(5) { /* Status */
+    width: 10%;
+}
+.table th:nth-child(6), .table td:nth-child(6) { /* Actions */
+    width: 10%;
+}
+
+/* Utility to prevent button text from wrapping */
+.btn-no-wrap {
+    white-space: nowrap;
+}

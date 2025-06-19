@@ -1,15 +1,17 @@
 # routes/books.py
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from werkzeug.utils import secure_filename
 import csv
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import chardet
+import requests
 
 from models import Book, LoanHistory, Reservation, OperationLog, db, User, ReservationStatus, BookStatus
 from services.book_service import borrow_book, return_book, reserve_book, cancel_reservation
+from services.slack_service import send_slack_dm_to_user
 from forms.search import SearchForm
 from forms.book import BookForm, CATEGORIES
 
@@ -99,7 +101,26 @@ def borrow(book_id):
     success, result = borrow_book(book_id, current_user.id)
     
     if success:
-        flash('書籍を借りました。', 'success')
+        flash('本を借りました。', 'success')
+        
+        # 貸出記録を取得
+        loan = LoanHistory.query.filter_by(
+            book_id=book_id,
+            borrower_id=current_user.id,
+            return_date=None
+        ).first()
+        
+        # Slack通知を送信
+        if loan and loan.book:
+            book_url = url_for('books.book_detail', book_id=book_id, _external=True)
+            message = (
+                f"図書管理アプリです！以下の本の貸出がされました。\n"
+                f"書籍：<{book_url}|{loan.book.title}>\n"
+                f"返却期限：{loan.due_date.strftime('%Y-%m-%d')}\n\n"
+                f"返却期限を守り、書籍は元の場所へ返却するようお願いいたします。"
+            )
+            # 貸し出した本人にDMを送信
+            send_slack_dm_to_user(current_user, message)
         
         # 操作ログの記録
         log = OperationLog(
@@ -132,6 +153,17 @@ def return_book_route(book_id):
         flash('この本は既に返却されています。', 'warning')
         return redirect(url_for('books.book_detail', book_id=book_id))
     
+    # Slack通知 (返却)
+    book_url = url_for('books.book_detail', book_id=book_id, _external=True)
+    return_message = (
+        f"図書管理アプリです！以下の本が返却されました。\n"
+        f"書籍：<{book_url}|{book.title}>\n"
+        f"返却者：{current_user.name}\n\n"
+        f"ご利用ありがとうございました。"
+    )
+    # 返却した本人にDMを送信
+    send_slack_dm_to_user(current_user, return_message)
+
     # 返却日時を設定
     loan.return_date = datetime.utcnow()
     
@@ -149,10 +181,20 @@ def return_book_route(book_id):
     if next_reservation:
         # 予約者のステータスを更新
         next_reservation.status = ReservationStatus.NOTIFIED
+        next_reservation.notification_sent_at = datetime.utcnow()
         next_reservation.notification_sent = True
         
-        # メール通知を一時的に無効化
-        # send_book_available_notification(next_reservation.user, book)
+        # Slack通知 (予約者に利用可能)
+        book_url = url_for('books.book_detail', book_id=book_id, _external=True)
+        reservation_message = (
+            f"図書管理アプリです！ご予約の本がご用意できました。\n"
+            f"書籍：<{book_url}|{book.title}>\n"
+            f"貸出期限：{(datetime.utcnow() + timedelta(days=7)).strftime('%Y-%m-%d')}\n\n"
+            f"期限までに貸出手続きをお願いいたします。"
+        )
+        # 予約者にDMを送信
+        send_slack_dm_to_user(next_reservation.user, reservation_message)
+        flash(f'{next_reservation.user.name} さんに予約書籍が利用可能になったことを通知しました。', 'info')
         
         # 書籍の状態を予約済みに更新
         book.status = BookStatus.RESERVED
@@ -177,6 +219,15 @@ def reserve(book_id):
     success, result = reserve_book(book_id, current_user.id)
     
     if success:
+        book = Book.query.get_or_404(book_id)
+        book_url = url_for('books.book_detail', book_id=book_id, _external=True)
+        message = (
+            f"図書管理アプリです！以下の本を予約しました。\n"
+            f"書籍：<{book_url}|{book.title}>\n\n"
+            f"貸出可能になりましたら、改めてご連絡します。"
+        )
+        # 予約した本人にDMを送信
+        send_slack_dm_to_user(current_user, message)
         flash(result, 'success')
         
         # 操作ログの記録
@@ -203,6 +254,13 @@ def cancel(reservation_id):
     success, result = cancel_reservation(reservation_id, current_user.id)
     
     if success:
+        book_url = url_for('books.book_detail', book_id=book_id, _external=True)
+        message = (
+            f"図書管理アプリです！以下の本の予約をキャンセルしました。\n"
+            f"書籍：<{book_url}|{reservation.book.title}>"
+        )
+        # キャンセルした本人にDMを送信
+        send_slack_dm_to_user(current_user, message)
         flash(result, 'success')
         
         # 操作ログの記録
@@ -295,90 +353,88 @@ def import_books():
             success_count = 0
             error_count = 0
             errors = []
+            books_to_add = []
             
             try:
                 # ファイルの文字コードを自動判定
                 with open(filepath, 'rb') as f:
                     raw_data = f.read()
                     result = chardet.detect(raw_data)
-                    encoding = result['encoding']
+                    encoding = result['encoding'] if result['encoding'] else 'utf-8'
                 
-                with open(filepath, 'r', encoding=encoding) as csvfile:
-                    # 1行目を読んでヘッダーをチェック
-                    first_line = csvfile.readline().strip()
-                    if 'title' not in first_line.lower():
-                        flash('CSVファイルに「title」列が含まれていません。', 'danger')
-                        return redirect(request.url)
-                    
-                    # ファイルポインタを先頭に戻す
-                    csvfile.seek(0)
+                with open(filepath, 'r', encoding=encoding, newline='') as csvfile:
                     reader = csv.DictReader(csvfile)
                     
-                    # ヘッダーの存在確認
+                    # ヘッダーの正規化と存在確認
+                    reader.fieldnames = [h.lower().strip() for h in reader.fieldnames]
                     required_headers = ['title']
-                    missing_headers = [h for h in required_headers if h not in reader.fieldnames]
-                    if missing_headers:
+                    if not all(h in reader.fieldnames for h in required_headers):
+                        missing_headers = [h for h in required_headers if h not in reader.fieldnames]
                         flash(f'必須列が不足しています: {", ".join(missing_headers)}', 'danger')
                         return redirect(request.url)
                     
-                    for row_num, row in enumerate(reader, start=2):  # ヘッダー行を除くため2から開始
+                    for row_num, row in enumerate(reader, start=2):
                         try:
-                            # 必須フィールドのチェック
-                            if not row.get('title'):
-                                errors.append(f'行 {row_num}: タイトルが入力されていません')
+                            title = row.get('title', '').strip()
+                            if not title:
+                                errors.append(f'行 {row_num}: title は必須です。')
                                 error_count += 1
                                 continue
                             
-                            # データの作成
+                            # 書籍の重複をチェック（タイトルと著者で簡易的に）
+                            author = row.get('author', '').strip()
+                            if Book.query.filter_by(title=title, author=author).first():
+                                errors.append(f'行 {row_num}: 既に同じ書籍（タイトルと著者が一致）が存在します: {title}')
+                                error_count += 1
+                                continue
+
                             book = Book(
-                                title=row['title'].strip(),
-                                author=row.get('author', '').strip(),
+                                title=title,
+                                author=author,
                                 category1=row.get('category1', '').strip(),
                                 category2=row.get('category2', '').strip(),
                                 keywords=row.get('keywords', '').strip(),
                                 location=row.get('location', '').strip()
                             )
-                            db.session.add(book)
-                            success_count += 1
+                            books_to_add.append(book)
                             
-                            # 100件ごとにコミット
-                            if success_count % 100 == 0:
-                                db.session.commit()
-                                
                         except Exception as e:
                             error_count += 1
-                            errors.append(f'行 {row_num}: {str(e)}')
-                    
-                    # 残りのデータをコミット
+                            errors.append(f'行 {row_num} の処理中に予期せぬエラー: {str(e)}')
+
+                # エラーがある場合はインポート処理を中断
+                if error_count > 0:
+                    flash('CSVファイル内にエラーが検出されたため、インポートを中断しました。', 'danger')
+                    for error in errors[:10]:
+                        flash(error, 'danger')
+                    if len(errors) > 10:
+                        flash(f'他 {len(errors) - 10} 件のエラーがあります。', 'warning')
+                    return redirect(url_for('books.import_books'))
+
+                # エラーがなければ一括でコミット
+                if books_to_add:
+                    db.session.add_all(books_to_add)
                     db.session.commit()
+                    success_count = len(books_to_add)
                     
                     # 操作ログの記録
                     log = OperationLog(
                         user_id=current_user.id,
                         action='import_books',
                         target=f'Imported {success_count} books',
-                        details=f'Success: {success_count}, Errors: {error_count}',
                         ip_address=request.remote_addr
                     )
                     db.session.add(log)
                     db.session.commit()
                     
-                    if success_count > 0:
-                        flash(f'{success_count}件の書籍を登録しました。', 'success')
-                    if error_count > 0:
-                        flash(f'{error_count}件の登録に失敗しました。', 'warning')
-                        for error in errors[:10]:  # 最初の10件のエラーのみ表示
-                            flash(error, 'danger')
-                        if len(errors) > 10:
-                            flash(f'他 {len(errors) - 10} 件のエラーがあります。', 'warning')
-            
+                    flash(f'{success_count}件の書籍を正常に登録しました。', 'success')
+
             except Exception as e:
                 db.session.rollback()
-                flash(f'CSVファイルの処理中にエラーが発生しました: {str(e)}', 'danger')
-                app.logger.error(f'CSV import error: {str(e)}')
+                flash(f'CSVファイルの処理中に予期せぬエラーが発生しました: {str(e)}', 'danger')
+                current_app.logger.error(f'CSV import error: {str(e)}')
             
             finally:
-                # アップロードされたファイルを削除
                 if os.path.exists(filepath):
                     os.remove(filepath)
             
@@ -388,3 +444,56 @@ def import_books():
         return redirect(request.url)
     
     return render_template('books/import.html')
+
+def send_webhook_notification(loan_info):
+    """Power AutomateのWebhookに通知を送信する"""
+    webhook_url = current_app.config.get('POWER_AUTOMATE_WEBHOOK_URL')
+    if not webhook_url:
+        current_app.logger.error("環境変数 'POWER_AUTOMATE_WEBHOOK_URL' が設定されていません。")
+        return
+
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        'book_title': loan_info.book.title,
+        'borrower_name': loan_info.borrower.name,
+        'borrower_email': loan_info.borrower.email,
+        'loan_date': loan_info.loan_date.isoformat() + 'Z',
+        'due_date': loan_info.due_date.isoformat() + 'Z' if loan_info.due_date else None,
+    }
+
+    try:
+        response = requests.post(webhook_url, json=payload, headers=headers, timeout=10)
+        response.raise_for_status()  # 2xx以外はエラーを発生させる
+        current_app.logger.info(f"Webhook通知を送信しました: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        current_app.logger.error(f"Webhookの送信に失敗しました: {e}")
+
+@books_bp.route('/edit/<int:book_id>', methods=['GET', 'POST'])
+@login_required
+def edit_book(book_id):
+    """書籍情報を編集する (管理者のみ)"""
+    if not current_user.is_admin:
+        flash('この操作は管理者のみ許可されています。', 'danger')
+        return redirect(url_for('books.index'))
+
+    book = Book.query.get_or_404(book_id)
+    form = BookForm(obj=book)
+
+    if form.validate_on_submit():
+        form.populate_obj(book)
+        db.session.commit()
+        
+        log = OperationLog(
+            user_id=current_user.id,
+            action='edit_book',
+            target=f'Book {book.id}',
+            details=f"Title: {book.title}",
+            ip_address=request.remote_addr
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        flash('書籍情報が更新されました。', 'success')
+        return redirect(url_for('books.book_detail', book_id=book.id))
+
+    return render_template('books/edit.html', form=form, book=book)

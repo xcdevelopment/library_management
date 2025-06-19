@@ -13,19 +13,18 @@
                 <div class="card-body">
                     <form method="POST" enctype="multipart/form-data">
                         <div class="mb-4">
-                            <h5>CSVファイル形式</h5>
-                            <p>以下の列を含むCSVファイルをアップロードしてください：</p>
+                            <h5>CSVフォーマット</h5>
+                            <p>以下の列を含むCSVファイルをアップロードしてください（1行目はヘッダー行）。</p>
                             <ul>
-                                <li><strong>username</strong>: ユーザー名（必須）</li>
+                                <li><strong>email</strong>: メールアドレス（必須）</li>
                                 <li><strong>password</strong>: パスワード（必須）</li>
                                 <li><strong>name</strong>: 氏名（必須）</li>
-                                <li><strong>email</strong>: メールアドレス（任意）</li>
-                                <li><strong>is_admin</strong>: 管理者権限（任意、true/false）</li>
+                                <li><strong>is_admin</strong>: 管理者権限（true/false, 省略可）</li>
                             </ul>
-                            <p>CSVファイルの例：</p>
-                            <pre class="bg-light p-2">username,password,name,email,is_admin
-user1,pass123,山田太郎,yamada@example.com,false
-user2,pass456,鈴木花子,suzuki@example.com,true</pre>
+                            <p>CSVファイルのサンプル:</p>
+                            <pre class="bg-light p-2">email,password,name,is_admin
+user1@example.com,password123,山田太郎,false
+admin@example.com,adminpass,鈴木一郎,true</pre>
                         </div>
                         
                         <div class="mb-3">

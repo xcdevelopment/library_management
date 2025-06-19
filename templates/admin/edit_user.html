@@ -3,52 +3,39 @@
 {% block title %}ユーザー編集{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container mt-4">
     <div class="row">
         <div class="col-md-8 offset-md-2">
             <div class="card">
                 <div class="card-header">
-                    <h2 class="mb-0">ユーザー編集</h2>
+                    <h3>ユーザー編集: {{ user.name }}</h3>
                 </div>
                 <div class="card-body">
                     <form method="POST">
+                        {{ form.hidden_tag() }}
+
                         <div class="mb-3">
-                            <label for="username" class="form-label">ユーザー名</label>
-                            <input type="text" class="form-control" id="username" value="{{ user.username }}" readonly>
-                            <div class="form-text">ユーザー名は変更できません</div>
+                            {{ form.name.label(class="form-label") }}
+                            {{ form.name(class="form-control") }}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.email.label(class="form-label") }}
+                            {{ form.email(class="form-control") }}
                         </div>
 
                         <div class="mb-3">
-                            <label for="name" class="form-label">氏名</label>
-                            <input type="text" class="form-control" id="name" name="name" value="{{ user.name }}" required>
+                            {{ form.password.label(class="form-label") }}
+                            {{ form.password(class="form-control", placeholder="変更する場合のみ入力") }}
                         </div>
 
-                        <div class="mb-3">
-                            <label for="email" class="form-label">メールアドレス</label>
-                            <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}">
+                        <div class="form-check mb-3">
+                            {{ form.is_admin(class="form-check-input") }}
+                            {{ form.is_admin.label(class="form-check-label") }}
                         </div>
-
-                        <div class="mb-3">
-                            <label for="password" class="form-label">パスワード</label>
-                            <input type="password" class="form-control" id="password" name="password">
-                            <div class="form-text">変更する場合のみ入力してください</div>
-                        </div>
-
-                        <div class="mb-3">
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input" id="is_admin" name="is_admin" {% if user.is_admin %}checked{% endif %}>
-                                <label class="form-check-label" for="is_admin">管理者権限</label>
-                            </div>
-                        </div>
-
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> 保存
-                            </button>
-                            <a href="{{ url_for('admin.user_list') }}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left"></i> ユーザー一覧に戻る
-                            </a>
-                        </div>
+                        
+                        {{ form.submit(class="btn btn-primary") }}
+                        <a href="{{ url_for('admin.users') }}" class="btn btn-secondary">キャンセル</a>
                     </form>
                 </div>
             </div>

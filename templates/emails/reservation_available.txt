@@ -1,4 +1,3 @@
-<!-- templates/emails/reservation_available.txt -->
 図書管理アプリ - 予約本のお知らせ
 
 {{ user.name }} 様
@@ -12,7 +11,7 @@
 
 図書は7日間予約が保持されます。この期間内にご来館の上、貸出手続きを行ってください。
 
-図書の詳細を見る: {{ url_for('books.detail', id=book.id, _external=True) }}
+図書の詳細を見る: {{ url_for('books.book_detail', book_id=book.id, _external=True) }}
 
 ---
 このメールは自動送信されています。返信はできません。

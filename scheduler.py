@@ -20,8 +20,11 @@ from datetime import datetime, timedelta
 # アプリケーションのルートディレクトリをパスに追加
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-from models import db, User, Book, LoanHistory, Reservation
-from services.email_service import send_due_date_reminder, send_reservation_notification
+from flask import url_for
+
+from models import db, User, Book, LoanHistory, Reservation, ReservationStatus
+from services.slack_service import send_slack_dm_to_user
+from services.book_service import release_book_from_reservation
 
 # ロギング設定
 def setup_logging():
@@ -43,12 +46,11 @@ def setup_logging():
 def setup_app_context():
     """アプリケーションコンテキストのセットアップ"""
     from app import create_app
-    app = create_app('production')
+    app = create_app(os.getenv('FLASK_ENV') or 'production')
     return app
 
 def check_due_date_reminders(logger):
     """返却期限が近い貸出のリマインダーを送信"""
-    # 返却期限が3日以内で、まだリマインダーを送っていない貸出を検索
     now = datetime.utcnow()
     reminder_date = now + timedelta(days=3)
     
@@ -56,21 +58,38 @@ def check_due_date_reminders(logger):
         LoanHistory.return_date.is_(None),
         LoanHistory.reminder_sent.is_(False),
         LoanHistory.due_date <= reminder_date,
-        LoanHistory.due_date > now  # まだ期限切れではないもの
+        LoanHistory.due_date > now
     ).all()
     
     reminder_count = 0
     for loan in loans:
-        # メール送信処理
-        success = send_due_date_reminder(loan)
-        if success:
-            loan.reminder_sent = True
-            reminder_count += 1
-            logger.info(f"Due date reminder sent for loan {loan.id} (book: {loan.book_title}, user: {loan.borrower.username if loan.borrower else 'unknown'})")
-    
-    # 変更を保存
+        try:
+            days_remaining = (loan.due_date.date() - datetime.utcnow().date()).days
+            
+            book_url = url_for('books.book_detail', book_id=loan.book_id, _external=True)
+            message = (
+                f"図書管理アプリです！貸出中の本の返却期限が近づいています。\n"
+                f"書籍：<{book_url}|{loan.book.title}>\n"
+                f"返却期限：{loan.due_date.strftime('%Y-%m-%d')} ({days_remaining}日前)\n\n"
+                f"期限内のご返却にご協力をお願いいたします。"
+            )
+            
+            # 貸出者にDMを送信
+            success = send_slack_dm_to_user(loan.borrower, message)
+
+            if success:
+                loan.reminder_sent = True
+                db.session.add(loan)
+                db.session.commit()
+                reminder_count += 1
+                logger.info(f"Due date reminder sent for loan {loan.id}")
+            else:
+                logger.warning(f"Failed to send due date reminder for loan {loan.id}")
+        except Exception as e:
+            logger.error(f"Error sending reminder for loan {loan.id}: {e}")
+            db.session.rollback()
+
     if reminder_count > 0:
-        db.session.commit()
         logger.info(f'返却期限リマインダーを {reminder_count} 件送信しました')
     else:
         logger.info('送信すべき返却期限リマインダーはありませんでした')
@@ -79,28 +98,30 @@ def check_due_date_reminders(logger):
 
 def cleanup_expired_reservations(logger):
     """期限切れ予約をクリーンアップ"""
-    # 7日以上前に通知された予約をキャンセル
     expiry_date = datetime.utcnow() - timedelta(days=7)
     
     expired_reservations = Reservation.query.filter(
-        Reservation.status == 'notified',
-        Reservation.notification_sent.is_(True),
-        Reservation.reservation_date < expiry_date
+        Reservation.status == ReservationStatus.NOTIFIED,
+        Reservation.notification_sent_at < expiry_date
     ).all()
     
     cancelled_count = 0
     for reservation in expired_reservations:
-        # 予約をキャンセル
-        reservation.status = 'cancelled'
-        cancelled_count += 1
-        logger.info(f"Cancelled expired reservation {reservation.id} (book: {reservation.book.title}, user: {reservation.user.username})")
-    
-    # 変更を保存
+        try:
+            reservation.status = ReservationStatus.EXPIRED
+            release_book_from_reservation(reservation.book)
+            db.session.add(reservation)
+            db.session.commit()
+            cancelled_count += 1
+            logger.info(f"Expired reservation {reservation.id} for book {reservation.book.title}")
+        except Exception as e:
+            logger.error(f"Error expiring reservation {reservation.id}: {e}")
+            db.session.rollback()
+
     if cancelled_count > 0:
-        db.session.commit()
-        logger.info(f'期限切れ予約を {cancelled_count} 件キャンセルしました')
+        logger.info(f'期限切れ予約を {cancelled_count} 件クリーンアップしました')
     else:
-        logger.info('キャンセルすべき期限切れ予約はありませんでした')
+        logger.info('クリーンアップすべき期限切れ予約はありませんでした')
     
     return cancelled_count
 
@@ -112,11 +133,10 @@ def main():
     try:
         app = setup_app_context()
         with app.app_context():
-            # 1. 返却期限リマインダー
-            check_due_date_reminders(logger)
-            
-            # 2. 期限切れ予約のクリーンアップ
-            cleanup_expired_reservations(logger)
+            # url_forが動作するようにリクエストコンテキストをプッシュ
+            with app.test_request_context():
+                check_due_date_reminders(logger)
+                cleanup_expired_reservations(logger)
         
         logger.info('定期実行タスクが正常に完了しました')
         

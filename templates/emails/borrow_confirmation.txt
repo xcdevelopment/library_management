@@ -1,0 +1,20 @@
+図書管理アプリ - 貸出完了のお知らせ
+
+{{ user.name }} 様
+
+書籍の貸出が完了しました。
+
+図書情報:
+- タイトル: {{ book.title }}
+- 著者: {{ book.author }}
+- 貸出日: {{ loan.loan_date.strftime('%Y年%m月%d日') }}
+- 返却期限: {{ loan.due_date.strftime('%Y年%m月%d日') }}
+
+返却期限の3日前にリマインダーメールをお送りします。
+期限内での返却をお願いいたします。
+
+図書の詳細: {{ url_for('books.book_detail', book_id=book.id, _external=True) }}
+
+---
+このメールは自動送信されています。返信はできません。
+© 2025 図書管理アプリ

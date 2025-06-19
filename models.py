@@ -5,6 +5,7 @@ from argon2 import PasswordHasher
 from datetime import datetime, timedelta
 from enum import Enum
 import json
+from sqlalchemy.orm import validates
 
 db = SQLAlchemy()
 ph = PasswordHasher()
@@ -14,13 +15,18 @@ class User(db.Model, UserMixin):
     __tablename__ = 'users'
     
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     name = db.Column(db.String(100), nullable=False)  # 氏名
-    email = db.Column(db.String(120), unique=True, index=True)    # メールアドレス
     is_admin = db.Column(db.Boolean, default=False)   # 権限（管理者かどうか）
+    slack_user_id = db.Column(db.String(50), nullable=True)  # SlackユーザーIDを保存するカラム
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    loans = db.relationship('LoanHistory', back_populates='borrower', lazy=True)
+    reservations = db.relationship('Reservation', back_populates='user', lazy=True, cascade="all, delete-orphan")
+    operation_logs = db.relationship('OperationLog', back_populates='user', lazy=True, cascade="all, delete-orphan")
     
     def set_password(self, password):
         """パスワードをArgon2でハッシュ化してセットする"""
@@ -37,22 +43,23 @@ class User(db.Model, UserMixin):
             return False
     
     def __repr__(self):
-        return f'<User {self.username}>'
+        return f'<User {self.email}>'
 
 
-class BookStatus(str, Enum):
+class BookStatus(Enum):
     """書籍状態の列挙型"""
-    AVAILABLE = 'available'      # 利用可能
-    BORROWED = 'borrowed'        # 貸出中
-    RESERVED = 'reserved'        # 予約済み
-    UNAVAILABLE = 'unavailable'  # 利用不可
+    AVAILABLE = '利用可能'
+    ON_LOAN = '貸出中'
+    RESERVED = '予約あり'
+    UNAVAILABLE = '利用不可'
 
-class ReservationStatus(str, Enum):
+class ReservationStatus(Enum):
     """予約状態の列挙型"""
-    PENDING = 'pending'      # 予約中
-    NOTIFIED = 'notified'    # 通知済み
-    COMPLETED = 'completed'  # 完了
-    CANCELLED = 'cancelled'  # キャンセル
+    PENDING = 'pending'     # 予約受付中
+    NOTIFIED = 'notified'   # 利用可能（通知済み）
+    FULFILLED = 'fulfilled' # 貸出完了
+    CANCELLED = 'cancelled' # キャンセル
+    EXPIRED = 'expired'     # 期限切れ
 
 class Book(db.Model):
     """書籍情報テーブル"""
@@ -60,7 +67,7 @@ class Book(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)  # 番号
     title = db.Column(db.String(200), nullable=False, index=True)  # 書籍名
-    status = db.Column(db.String(20), default=BookStatus.AVAILABLE, index=True)  # 状態を追加
+    status = db.Column(db.Enum(BookStatus), default=BookStatus.AVAILABLE, index=True)  # 状態を追加
     is_available = db.Column(db.Boolean, default=True, index=True)  # 貸出可否
     author = db.Column(db.String(100), index=True)  # 著者
     category1 = db.Column(db.String(50), index=True)  # 第１分類
@@ -68,14 +75,20 @@ class Book(db.Model):
     keywords = db.Column(db.String(200))  # キーワード
     location = db.Column(db.String(100))  # 場所
     borrower_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # 借りた人
-    borrower = db.relationship('User', backref=db.backref('borrowed_books', lazy='dynamic'))
+    borrower = db.relationship('User', backref=db.backref('borrowed_books', lazy=True))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    loans = db.relationship('LoanHistory', back_populates='book', lazy=True)
+    reservations = db.relationship('Reservation', back_populates='book', lazy=True, cascade="all, delete-orphan")
     
     @property
     def current_loan(self):
         """現在の貸出情報を取得"""
-        return self.loan_history.filter_by(return_date=None).first()
+        if not self.loans:
+            return None
+        return next((loan for loan in self.loans if loan.return_date is None), None)
     
     @property
     def search_vector(self):
@@ -97,11 +110,11 @@ class LoanHistory(db.Model):
     __tablename__ = 'loan_history'
     
     id = db.Column(db.Integer, primary_key=True)  # 履歴ID
-    book_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False, index=True)
-    book = db.relationship('Book', backref=db.backref('loan_history', lazy='dynamic'))
+    book_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False)
+    book = db.relationship('Book', back_populates='loans')
     book_title = db.Column(db.String(200), nullable=False)  # 書籍名
-    borrower_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
-    borrower = db.relationship('User', backref=db.backref('loan_history', lazy='dynamic'))
+    borrower_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    borrower = db.relationship('User', back_populates='loans')
     loan_date = db.Column(db.DateTime, default=datetime.utcnow, index=True)  # 貸出日
     due_date = db.Column(db.DateTime, nullable=True, index=True)  # 返却期限日
     return_date = db.Column(db.DateTime, nullable=True, index=True)  # 返却日
@@ -137,13 +150,20 @@ class Reservation(db.Model):
     __tablename__ = 'reservations'
     
     id = db.Column(db.Integer, primary_key=True)
-    book_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False)
-    book = db.relationship('Book', backref=db.backref('reservations', lazy=True))
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    user = db.relationship('User', backref=db.backref('reservations', lazy=True))
-    reservation_date = db.Column(db.DateTime, default=datetime.utcnow)
-    notification_sent = db.Column(db.Boolean, default=False)  # 通知送信済みフラグ
-    status = db.Column(db.String(20), default=ReservationStatus.PENDING)
+    book_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False)
+    reservation_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    # 予約ステータス (pending, notified, fulfilled, cancelled, expired)
+    status = db.Column(db.Enum(ReservationStatus), nullable=False, default=ReservationStatus.PENDING, index=True)
+    
+    # 通知フラグと日時
+    notification_sent = db.Column(db.Boolean, default=False)
+    notification_sent_at = db.Column(db.DateTime, nullable=True)
+    
+    # Relationships
+    user = db.relationship('User', back_populates='reservations')
+    book = db.relationship('Book', back_populates='reservations')
     
     @property
     def queue_position(self):
@@ -172,16 +192,14 @@ class OperationLog(db.Model):
     __tablename__ = 'operation_logs'
     
     id = db.Column(db.Integer, primary_key=True)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     action = db.Column(db.String(50), nullable=False)
-    target = db.Column(db.String(50), nullable=False)
-    details = db.Column(db.Text, nullable=True)
-    ip_address = db.Column(db.String(50), nullable=True)
-    additional_data = db.Column(db.Text, nullable=True)
+    target = db.Column(db.String(100))
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    ip_address = db.Column(db.String(50))
     
-    # リレーションシップ
-    user = db.relationship('User', backref=db.backref('operation_logs', lazy=True))
+    # Relationship
+    user = db.relationship('User', back_populates='operation_logs')
     
     def __repr__(self):
         return f'<OperationLog {self.action}>'

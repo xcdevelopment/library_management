@@ -25,7 +25,7 @@
                 <li><strong>場所:</strong> {{ book.location }}</li>
             </ul>
             <p>図書は7日間予約が保持されます。この期間内にご来館の上、貸出手続きを行ってください。</p>
-            <p><a href="{{ url_for('books.detail', id=book.id, _external=True) }}">図書の詳細を見る</a></p>
+            <p><a href="{{ url_for('books.book_detail', book_id=book.id, _external=True) }}">図書の詳細を見る</a></p>
         </div>
         <div class="footer">
             <p>このメールは自動送信されています。返信はできません。</p>

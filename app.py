@@ -7,6 +7,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 from flask_bootstrap import Bootstrap
+from flask_mail import Mail
 import os
 import sys
 import logging
@@ -14,16 +15,22 @@ from logging.handlers import RotatingFileHandler
 from flask_sqlalchemy import SQLAlchemy
 from flask.cli import with_appcontext
 import click
+from services.slack_service import send_error_notification
+import traceback
 
 # カレントディレクトリをパスに追加
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from models import db, User, OperationLog
+
+# Flask-Mail instance for email services
+mail = Mail()
 from routes.auth import auth_bp
 from routes.books import books_bp
 from routes.users import users_bp
 from routes.admin import admin_bp
 from routes.reservations import reservations_bp
+from routes.api import api_bp
 from utils.logger import setup_logger
 from config import config
 
@@ -93,6 +100,35 @@ def reset_admin_password_command():
         db.session.rollback()
         print(f"Error resetting admin password: {e}")
 
+def create_admin(app):
+    with app.app_context():
+        # 初期管理者ユーザーの作成
+        email = 'Development@xcap.co.jp'
+        password = 'adminpass'
+        # ユーザーが既に存在するか確認
+        if not User.query.filter_by(email=email).first():
+            admin = User(
+                email=email,
+                name='管理者',
+                is_admin=True
+            )
+            admin.set_password(password)
+            db.session.add(admin)
+            db.session.commit()
+            print(f'管理者アカウント {email} が作成されました。')
+
+            # ログ記録
+            log = OperationLog(
+                user_id=admin.id,
+                action='admin_created',
+                target=f'User: {admin.email}',
+                ip_address='localhost' # システムによる自動作成
+            )
+            db.session.add(log)
+            db.session.commit()
+        else:
+            print(f'管理者アカウント {email} は既に存在します。')
+
 def create_app(config_name=None):
     """アプリケーションファクトリ"""
     # FLASK_ENV から設定名を決定、未設定なら 'default' を使う
@@ -136,8 +172,59 @@ def create_app(config_name=None):
     # テンプレート自動リロードの有効化
     app.config['TEMPLATES_AUTO_RELOAD'] = True
     
+    # 環境に応じたセキュリティ設定
+    is_production = os.environ.get('FLASK_ENV') == 'production'
+    
+    # Talismanの設定
+    csp = {
+        'default-src': '\'self\'',
+        'script-src': [
+            '\'self\'',
+            '\'unsafe-inline\'',  # インラインJavaScriptを許可
+            'https://cdn.jsdelivr.net'
+        ],
+        'style-src': [
+            '\'self\'',
+            '\'unsafe-inline\'',  # インラインCSSを許可
+            'https://cdn.jsdelivr.net',
+            'https://cdnjs.cloudflare.com'
+        ],
+        'img-src': [
+            '\'self\'',
+            'data:',  # data URIを許可（Bootstrap selectボックスのアイコン用）
+            'https:'
+        ],
+        'font-src': [
+            '\'self\'',
+            'https://cdnjs.cloudflare.com'
+        ]
+    }
+
+    Talisman(app,
+        force_https=is_production,  # 本番環境でのみHTTPSを強制
+        session_cookie_secure=is_production,
+        session_cookie_http_only=True,
+        session_cookie_samesite='Lax',
+        content_security_policy=csp,
+        feature_policy={
+            'geolocation': '\'none\'',
+            'midi': '\'none\'',
+            'notifications': '\'none\'',
+            'push': '\'none\'',
+            'sync-xhr': '\'none\'',
+            'microphone': '\'none\'',
+            'camera': '\'none\'',
+            'magnetometer': '\'none\'',
+            'gyroscope': '\'none\'',
+            'speaker': '\'none\'',
+            'vibrate': '\'none\'',
+            'fullscreen': '\'none\'',
+            'payment': '\'none\''
+        }
+    )
+    
     # セッション設定
-    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_SECURE'] = is_production
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1時間
@@ -146,6 +233,13 @@ def create_app(config_name=None):
     db.init_app(app)
     Bootstrap(app)
     migrate = Migrate(app, db)
+    
+    # この時点でdbが初期化されているので、管理者を作成できる
+    with app.app_context():
+        create_admin(app)
+
+    # メール初期化
+    mail.init_app(app)
     
     # ログインマネージャー設定
     login_manager = LoginManager()
@@ -177,35 +271,7 @@ def create_app(config_name=None):
     app.register_blueprint(users_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(reservations_bp)
-    
-    # セキュリティヘッダーの設定（開発環境では一部制限を緩和）
-    if not app.debug:
-        Talisman(app,
-            force_https=True,
-            session_cookie_secure=True,
-            session_cookie_http_only=True,
-            feature_policy={
-                'geolocation': '\'none\'',
-                'midi': '\'none\'',
-                'notifications': '\'none\'',
-                'push': '\'none\'',
-                'sync-xhr': '\'none\'',
-                'microphone': '\'none\'',
-                'camera': '\'none\'',
-                'magnetometer': '\'none\'',
-                'gyroscope': '\'none\'',
-                'speaker': '\'none\'',
-                'vibrate': '\'none\'',
-                'fullscreen': '\'none\'',
-                'payment': '\'none\''
-            }
-        )
-    else:
-        Talisman(app,
-            force_https=False,
-            session_cookie_secure=False,
-            content_security_policy=None
-        )
+    app.register_blueprint(api_bp)
     
     # レート制限の設定
     limiter = Limiter(
@@ -229,12 +295,23 @@ def create_app(config_name=None):
     @app.errorhandler(500)
     def internal_error(e):
         db.session.rollback()
-        app.logger.error(f'Server Error: {e}')
+        
+        # スタックトレースを取得
+        tb_str = traceback.format_exc()
+        error_message = f"Error: {e}\nTraceback:\n{tb_str}"
+        
+        app.logger.error(f'Server Error: {error_message}')
+        
+        # Slack通知を送信
+        send_error_notification(error_message)
+
         return render_template('500.html'), 500
     
     @app.before_request
     def before_request():
-        if not request.is_secure and not app.debug:
+        # 'DYNO'はHerokuなどのPaaSで設定される環境変数。本番環境判定に利用。
+        is_production = os.environ.get('DYNO') is not None
+        if not request.is_secure and is_production:
             url = request.url.replace('http://', 'https://', 1)
             return redirect(url, code=301)
     
@@ -243,3 +320,14 @@ def create_app(config_name=None):
     app.cli.add_command(reset_admin_password_command)
 
     return app
+
+if __name__ == "__main__":
+    app = create_app()
+    if is_production:
+        app.run(
+            host="0.0.0.0",
+            port=5000,
+            ssl_context=("ssl/localhost.pem", "ssl/localhost-key.pem")
+        )
+    else:
+        app.run(host="0.0.0.0", port=5000)

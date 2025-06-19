@@ -2,7 +2,9 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 
+from services.user_service import update_user
 from models import User, db, OperationLog, Book, Reservation
+from forms.user import ProfileForm
 
 users_bp = Blueprint('users', __name__, url_prefix='/users')
 
@@ -161,3 +163,25 @@ def my_page():
     return render_template('users/my_page.html',
                          borrowed_books=borrowed_books,
                          reservations=reservations)
+
+@users_bp.route('/profile/edit', methods=['GET', 'POST'])
+@login_required
+def edit_profile():
+    """ユーザープロファイルの編集"""
+    user = current_user
+    form = ProfileForm(obj=user)
+    
+    if form.validate_on_submit():
+        try:
+            update_user(
+                user=user,
+                name=form.name.data,
+                email=form.email.data,
+                password=form.password.data if form.password.data else None
+            )
+            flash('プロフィールが更新されました。', 'success')
+            return redirect(url_for('users.my_page'))
+        except ValueError as e:
+            flash(str(e), 'danger')
+
+    return render_template('users/edit_profile.html', form=form, user=user)

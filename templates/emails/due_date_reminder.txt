@@ -1,4 +1,3 @@
-<!-- templates/emails/due_date_reminder.txt -->
 図書管理アプリ - 返却期限のお知らせ
 
 {{ user.name }} 様
@@ -14,7 +13,7 @@
 
 期限内に返却をお願いいたします。
 
-図書の詳細を見る: {{ url_for('books.detail', id=book.id, _external=True) }}
+図書の詳細を見る: {{ url_for('books.book_detail', book_id=book.id, _external=True) }}
 
 ---
 このメールは自動送信されています。返信はできません。

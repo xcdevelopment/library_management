@@ -38,7 +38,7 @@
             <div class="row">
                 <div class="col-md-6 mb-3">
                     {{ form.category1.label(class="form-label") }}
-                    {{ form.category1(class="form-select") }}
+                    {{ form.category1(class="form-select", id="category1") }}
                     {% if form.category1.errors %}
                     <div class="invalid-feedback d-block">
                         {% for error in form.category1.errors %}
@@ -50,7 +50,7 @@
 
                 <div class="col-md-6 mb-3">
                     {{ form.category2.label(class="form-label") }}
-                    {{ form.category2(class="form-select") }}
+                    {{ form.category2(class="form-select", id="category2") }}
                     {% if form.category2.errors %}
                     <div class="invalid-feedback d-block">
                         {% for error in form.category2.errors %}
@@ -88,39 +88,64 @@
 {% block scripts %}
 {{ super() }}
 <script>
-// 分類の定義
-const CATEGORIES = {{ categories|tojson }};
-
-// 第2分類の選択肢を更新する関数
-function updateCategory2Options() {
+document.addEventListener('DOMContentLoaded', function() {
     const category1Select = document.getElementById('category1');
     const category2Select = document.getElementById('category2');
-    const selectedCategory1 = category1Select.value;
     
-    // 現在の選択肢をクリア
-    category2Select.innerHTML = '';
-    
-    // デフォルトの選択肢を追加
-    const defaultOption = document.createElement('option');
-    defaultOption.value = '';
-    defaultOption.text = '選択してください';
-    category2Select.appendChild(defaultOption);
-    
-    // 選択された第1分類に基づいて第2分類の選択肢を追加
-    if (selectedCategory1 && CATEGORIES[selectedCategory1]) {
-        CATEGORIES[selectedCategory1].forEach(([value, text]) => {
-            const option = document.createElement('option');
-            option.value = value;
-            option.text = text;
-            category2Select.appendChild(option);
-        });
+    if (!category1Select || !category2Select) {
+        return; // 要素が存在しない場合は何もしない
     }
-}
-
-// 第1分類が変更されたときのイベントリスナーを設定
-document.getElementById('category1').addEventListener('change', updateCategory2Options);
-
-// ページ読み込み時に初期化
-document.addEventListener('DOMContentLoaded', updateCategory2Options);
+    
+    // 第1分類が変更されたときの処理
+    category1Select.addEventListener('change', function() {
+        const selectedCategory1 = this.value;
+        
+        // 第2分類をリセット
+        category2Select.innerHTML = '<option value="">選択してください</option>';
+        
+        if (selectedCategory1 === '') {
+            // 第1分類が未選択の場合は第2分類も無効化
+            category2Select.disabled = true;
+            return;
+        }
+        
+        // 第2分類を有効化
+        category2Select.disabled = false;
+        
+        // APIから第2分類の選択肢を取得
+        fetch(`/api/categories/${encodeURIComponent(selectedCategory1)}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                // 取得した選択肢を第2分類に追加
+                data.forEach(option => {
+                    const optionElement = document.createElement('option');
+                    optionElement.value = option.value;
+                    optionElement.textContent = option.text;
+                    category2Select.appendChild(optionElement);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching category2 options:', error);
+                // エラーの場合はデフォルトメッセージを表示
+                const errorOption = document.createElement('option');
+                errorOption.value = '';
+                errorOption.textContent = '選択肢の読み込みに失敗しました';
+                category2Select.appendChild(errorOption);
+            });
+    });
+    
+    // ページ読み込み時に第1分類が既に選択されている場合の処理
+    if (category1Select.value !== '') {
+        category1Select.dispatchEvent(new Event('change'));
+    } else {
+        // 第1分類が未選択の場合は第2分類を無効化
+        category2Select.disabled = true;
+    }
+});
 </script>
 {% endblock %}

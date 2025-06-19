@@ -14,9 +14,10 @@
         <div class="card-body">
             <div class="row">
                 <div class="col-md-6">
-                    <p><strong>名前：</strong> {{ current_user.name }}</p>
-                    <p><strong>メールアドレス：</strong> {{ current_user.email }}</p>
-                    <p><strong>権限：</strong> {% if current_user.is_admin %}管理者{% else %}一般ユーザー{% endif %}</p>
+                    <h5 class="card-title">{{ current_user.name }}</h5>
+                    <p class="card-text">メールアドレス: {{ current_user.email }}</p>
+                    <p class="card-text">権限: {% if current_user.is_admin %}管理者{% else %}一般ユーザー{% endif %}</p>
+                    <a href="{{ url_for('users.edit_profile') }}" class="btn btn-primary">プロフィールを編集</a>
                 </div>
             </div>
         </div>

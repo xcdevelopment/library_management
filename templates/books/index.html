@@ -13,11 +13,11 @@
                 </div>
                 <div class="col-md-3">
                     {{ form.category1.label(class="form-label") }}
-                    {{ form.category1(class="form-select") }}
+                    {{ form.category1(class="form-select", id="category1") }}
                 </div>
                 <div class="col-md-3">
                     {{ form.category2.label(class="form-label") }}
-                    {{ form.category2(class="form-select") }}
+                    {{ form.category2(class="form-select", id="category2") }}
                 </div>
                 <div class="col-md-2 d-flex align-items-end gap-2">
                     <button type="submit" class="btn btn-primary flex-grow-1">
@@ -101,39 +101,94 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 JavaScript loaded and DOM ready');
     const category1Select = document.getElementById('category1');
     const category2Select = document.getElementById('category2');
-    const categoryData = {{ categories|tojson|safe }};
-
+    
+    console.log('🔍 Elements found:', {
+        category1: category1Select,
+        category2: category2Select
+    });
+    
+    if (!category1Select || !category2Select) {
+        console.error('❌ Category select elements not found!');
+        return; // 要素が存在しない場合は何もしない
+    }
+    
+    console.log('✅ Both elements found, setting up event listener');
+    
     // 第1分類が変更されたときの処理
     category1Select.addEventListener('change', function() {
-        const selectedCategory = this.value;
+        const selectedCategory1 = this.value;
+        console.log('📝 Category1 changed to:', selectedCategory1);
         
-        // 第2分類の選択肢をクリア
+        // 第2分類をリセット
         category2Select.innerHTML = '<option value="">選択してください</option>';
         
-        if (selectedCategory && categoryData[selectedCategory]) {
-            // 選択された第1分類に基づいて第2分類の選択肢を更新
-            categoryData[selectedCategory].forEach(function(subCategory) {
-                const option = document.createElement('option');
-                option.value = subCategory[0];
-                option.textContent = subCategory[1];
-                category2Select.appendChild(option);
-            });
+        if (selectedCategory1 === '') {
+            // 第1分類が未選択の場合は第2分類も無効化
+            category2Select.disabled = true;
+            console.log('🚫 Category1 is empty, disabling category2');
+            return;
         }
-    });
-
-    // ページ読み込み時に現在の第1分類に基づいて第2分類を設定
-    if (category1Select.value) {
-        const event = new Event('change');
-        category1Select.dispatchEvent(event);
         
-        // URLパラメータから第2分類の値を取得して設定
-        const urlParams = new URLSearchParams(window.location.search);
-        const category2Value = urlParams.get('category2');
-        if (category2Value) {
-            category2Select.value = category2Value;
-        }
+        // 第2分類を有効化
+        category2Select.disabled = false;
+        
+        // APIから第2分類の選択肢を取得
+        const apiUrl = `/api/categories/${encodeURIComponent(selectedCategory1)}`;
+        console.log('🌐 Fetching from API URL:', apiUrl);
+        
+        fetch(apiUrl)
+            .then(response => {
+                console.log('📡 API Response status:', response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('📦 Received data:', data);
+                console.log('📊 Data length:', data.length);
+                
+                // 取得した選択肢を第2分類に追加
+                data.forEach((option, index) => {
+                    console.log(`➕ Adding option ${index + 1}:`, option);
+                    const optionElement = document.createElement('option');
+                    optionElement.value = option.value;
+                    optionElement.textContent = option.text;
+                    category2Select.appendChild(optionElement);
+                });
+                
+                console.log('✅ Category2 options updated successfully');
+                
+                // URLパラメータから第2分類の値を取得して設定
+                const urlParams = new URLSearchParams(window.location.search);
+                const category2Value = urlParams.get('category2');
+                if (category2Value) {
+                    category2Select.value = category2Value;
+                    console.log('🔄 Set category2 from URL param:', category2Value);
+                }
+            })
+            .catch(error => {
+                console.error('❌ Error fetching category2 options:', error);
+                // エラーの場合はデフォルトメッセージを表示
+                const errorOption = document.createElement('option');
+                errorOption.value = '';
+                errorOption.textContent = '選択肢の読み込みに失敗しました';
+                category2Select.appendChild(errorOption);
+            });
+    });
+    
+    // ページ読み込み時に第1分類が既に選択されている場合の処理
+    console.log('🔍 Initial category1 value:', category1Select.value);
+    if (category1Select.value !== '') {
+        console.log('🔄 Dispatching change event for initial value');
+        category1Select.dispatchEvent(new Event('change'));
+    } else {
+        // 第1分類が未選択の場合は第2分類を無効化
+        console.log('🚫 No initial category1 value, disabling category2');
+        category2Select.disabled = true;
     }
 });
 </script>

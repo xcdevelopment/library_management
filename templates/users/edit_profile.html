@@ -3,38 +3,41 @@
 {% block title %}プロフィール編集{% endblock %}
 
 {% block content %}
-<div class="container my-4">
-    <h1 class="mb-4">プロフィール編集</h1>
-
+<div class="container">
+    <h2>プロフィール編集</h2>
     <div class="card">
         <div class="card-body">
-            <form method="POST">
-                {{ form.csrf_token }}
-
-                <div class="mb-3">
+            <form method="POST" action="">
+                {{ form.hidden_tag() }}
+                <div class.mb-3>
                     {{ form.name.label(class="form-label") }}
                     {{ form.name(class="form-control") }}
-                    {% if form.name.errors %}
-                        {% for error in form.name.errors %}
-                            <div class="text-danger">{{ error }}</div>
-                        {% endfor %}
-                    {% endif %}
+                    {% for error in form.name.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
                 </div>
-
                 <div class="mb-3">
                     {{ form.email.label(class="form-label") }}
                     {{ form.email(class="form-control") }}
-                    {% if form.email.errors %}
-                        {% for error in form.email.errors %}
-                            <div class="text-danger">{{ error }}</div>
-                        {% endfor %}
-                    {% endif %}
+                    {% for error in form.email.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
                 </div>
-
-                <div class="text-end">
-                    <a href="{{ url_for('users.index') }}" class="btn btn-secondary me-2">キャンセル</a>
-                    <button type="submit" class="btn btn-primary">更新</button>
+                <div class="mb-3">
+                    {{ form.password.label(class="form-label") }}
+                    {{ form.password(class="form-control") }}
+                    {% for error in form.password.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
                 </div>
+                <div class="mb-3">
+                    {{ form.password_confirm.label(class="form-label") }}
+                    {{ form.password_confirm(class="form-control") }}
+                    {% for error in form.password_confirm.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                <button type="submit" class="btn btn-primary">更新</button>
             </form>
         </div>
     </div>
