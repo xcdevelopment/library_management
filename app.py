@@ -40,11 +40,11 @@ def init_db_command():
     """データベースを初期化し、初期管理者ユーザーを作成します。"""
     db.create_all()
     # 初期管理者ユーザーの作成
-    admin_email = 'admin@library.com'
+    admin_email = 'Development@xcap.co.jp'
     if not User.query.filter_by(email=admin_email).first():
         admin = User(email=admin_email, name='管理者', is_admin=True)
-        # 環境変数 ADMIN_PASSWORD を取得、なければデフォルト値を使用
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'change_me_immediately')
+        # 固定パスワードを使用
+        admin_password = 'adminpass'
         admin.set_password(admin_password)
         db.session.add(admin)
         db.session.commit()
@@ -69,17 +69,13 @@ def init_db_command():
 @with_appcontext
 def reset_admin_password_command():
     """管理者(admin)のパスワードを環境変数 ADMIN_PASSWORD の値でリセットします。"""
-    admin_email = 'admin@library.com'
+    admin_email = 'Development@xcap.co.jp'
     admin_user = User.query.filter_by(email=admin_email).first()
     if not admin_user:
         print(f"Error: Admin user '{admin_email}' not found.")
         return
 
-    admin_password = os.environ.get('ADMIN_PASSWORD')
-    if not admin_password:
-        print("Error: ADMIN_PASSWORD environment variable is not set.")
-        print("Please set the ADMIN_PASSWORD environment variable and try again.")
-        return
+    admin_password = 'adminpass'
 
     try:
         admin_user.set_password(admin_password)

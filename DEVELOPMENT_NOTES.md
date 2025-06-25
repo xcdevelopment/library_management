@@ -101,5 +101,5 @@ docker-compose exec -e PYTHONPATH=/app web python your_script_name.py
 ### `admin` ユーザーの初期パスワード
 `admin`ユーザーは、`app.py` 内の `init-db` コマンドで作成されます。
 - **ユーザー名:** `admin`
-- **初期パスワード:** `change_me_immediately`
+- **初期パスワード:** `adminpass`
 このパスワードは、`os.environ.get('ADMIN_PASSWORD', '...')` の部分で定義されています。

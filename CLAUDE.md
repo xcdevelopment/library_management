@@ -136,7 +136,7 @@ docker-compose exec web flask db downgrade
 ```
 
 ### Admin Management
-- Default admin user: `admin` / `change_me_immediately`
+- Default admin user: `Development@xcap.co.jp` / `adminpass`
 - Password can be reset via CLI command or environment variable
 
 ## Common Development Patterns
