@@ -40,8 +40,9 @@ def init_db_command():
     """データベースを初期化し、初期管理者ユーザーを作成します。"""
     db.create_all()
     # 初期管理者ユーザーの作成
-    if not User.query.filter_by(username='admin').first():
-        admin = User(username='admin', name='管理者', is_admin=True)
+    admin_email = 'admin@library.com'
+    if not User.query.filter_by(email=admin_email).first():
+        admin = User(email=admin_email, name='管理者', is_admin=True)
         # 環境変数 ADMIN_PASSWORD を取得、なければデフォルト値を使用
         admin_password = os.environ.get('ADMIN_PASSWORD', 'change_me_immediately')
         admin.set_password(admin_password)
@@ -51,7 +52,7 @@ def init_db_command():
 
         # 操作ログの記録 (requestオブジェクトがないためIPアドレスは'localhost'とする)
         # init-db実行時にはまだadmin.idが決まっていない可能性があるので注意 -> commit後に取得
-        admin = User.query.filter_by(username='admin').first() # commit後に再度取得
+        admin = User.query.filter_by(email=admin_email).first() # commit後に再度取得
         if admin:
             log = OperationLog(
                 user_id=admin.id,
@@ -68,9 +69,10 @@ def init_db_command():
 @with_appcontext
 def reset_admin_password_command():
     """管理者(admin)のパスワードを環境変数 ADMIN_PASSWORD の値でリセットします。"""
-    admin_user = User.query.filter_by(username='admin').first()
+    admin_email = 'admin@library.com'
+    admin_user = User.query.filter_by(email=admin_email).first()
     if not admin_user:
-        print("Error: Admin user 'admin' not found.")
+        print(f"Error: Admin user '{admin_email}' not found.")
         return
 
     admin_password = os.environ.get('ADMIN_PASSWORD')
@@ -83,13 +85,13 @@ def reset_admin_password_command():
         admin_user.set_password(admin_password)
         db.session.add(admin_user) # オブジェクトが変更されたのでセッションに追加
         db.session.commit()
-        print(f"Admin user 'admin' password has been reset using the ADMIN_PASSWORD environment variable.")
+        print(f"Admin user '{admin_email}' password has been reset using the ADMIN_PASSWORD environment variable.")
 
         # 必要であれば操作ログを記録
         log = OperationLog(
             user_id=admin_user.id,
             action='admin_password_reset',
-            target=f'User: {admin_user.username}',
+            target=f'User: {admin_user.email}',
             details='Admin password reset via CLI command.',
             ip_address='localhost' # CLIからの実行を示す
         )
