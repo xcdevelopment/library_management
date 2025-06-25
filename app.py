@@ -272,7 +272,6 @@ def create_app(config_name=None):
     # カスタムCLIコマンドの登録
     app.cli.add_command(init_db_command)
     app.cli.add_command(reset_admin_password_command)
-    app.cli.add_command(create_admin_command) # 新しいコマンドを登録
 
     # レート制限の設定
     limiter = Limiter(
