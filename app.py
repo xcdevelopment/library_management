@@ -43,8 +43,9 @@ def init_db_command():
     admin_email = 'Development@xcap.co.jp'
     if not User.query.filter_by(email=admin_email).first():
         admin = User(email=admin_email, name='管理者', is_admin=True)
-        # 固定パスワードを使用
-        admin_password = 'adminpass'
+        # 環境変数からパスワードを取得
+        from flask import current_app
+        admin_password = current_app.config['ADMIN_PASSWORD']
         admin.set_password(admin_password)
         db.session.add(admin)
         db.session.commit()
@@ -75,7 +76,8 @@ def reset_admin_password_command():
         print(f"Error: Admin user '{admin_email}' not found.")
         return
 
-    admin_password = 'adminpass'
+    from flask import current_app
+    admin_password = current_app.config['ADMIN_PASSWORD']
 
     try:
         admin_user.set_password(admin_password)

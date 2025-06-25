@@ -36,6 +36,9 @@ class Config:
     SLACK_ENABLED = os.environ.get('SLACK_ENABLED', 'false').lower() in ['true', '1', 't']
     ADMIN_SLACK_EMAIL = os.environ.get('ADMIN_SLACK_EMAIL', 'Development@xcap.co.jp')
     
+    # 管理者パスワード
+    ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'adminpass')
+    
     @staticmethod
     def init_app(app):
         pass
