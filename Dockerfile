@@ -11,6 +11,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 #アプリ全体をコピー
 COPY . .
 
+# entrypoint.shの改行コードをLFに変換
+RUN sed -i 's/\r$//' /app/entrypoint.sh
+
 # entrypoint.shに実行権限を付与
 RUN chmod +x /app/entrypoint.sh
 
