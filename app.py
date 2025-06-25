@@ -48,7 +48,7 @@ def init_db_command():
         admin.set_password(admin_password)
         db.session.add(admin)
         db.session.commit()
-        print(f'Initialized the database and created the admin user with password: {admin_password}')
+        print(f'Initialized the database and created the admin user with email: {admin_email}')
 
         # 操作ログの記録 (requestオブジェクトがないためIPアドレスは'localhost'とする)
         # init-db実行時にはまだadmin.idが決まっていない可能性があるので注意 -> commit後に取得
@@ -57,13 +57,13 @@ def init_db_command():
             log = OperationLog(
                 user_id=admin.id,
                 action='user_created',
-                target='Initial admin user',
+                target=f'Initial admin user: {admin.email}',
                 ip_address='localhost' # CLIからの実行を示す
             )
             db.session.add(log)
             db.session.commit()
     else:
-        print('Admin user already exists.')
+        print(f"Admin user '{admin_email}' already exists.")
 
 @click.command('reset-admin-password')
 @with_appcontext
@@ -85,7 +85,7 @@ def reset_admin_password_command():
         admin_user.set_password(admin_password)
         db.session.add(admin_user) # オブジェクトが変更されたのでセッションに追加
         db.session.commit()
-        print(f"Admin user '{admin_email}' password has been reset using the ADMIN_PASSWORD environment variable.")
+        print(f"Admin user '{admin_user.email}' password has been reset using the ADMIN_PASSWORD environment variable.")
 
         # 必要であれば操作ログを記録
         log = OperationLog(
@@ -100,7 +100,7 @@ def reset_admin_password_command():
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error resetting admin password: {e}")
+        print(f"Error resetting admin password for {admin_email}: {e}")
 
 def create_admin(app):
     with app.app_context():
