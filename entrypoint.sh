@@ -13,9 +13,9 @@ echo "Database started"
 echo "Running database migrations..."
 flask db upgrade
 
-# 初期管理者ユーザーを作成（存在しない場合のみ）
-echo "Creating initial admin user..."
-flask create-admin
+# 管理者パスワードをリセット（必要に応じて）
+echo "Ensuring admin user exists..."
+flask reset-admin-password
 
 # アプリケーションを起動
 exec "$@"
