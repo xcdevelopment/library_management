@@ -4,6 +4,9 @@ FROM python:3.11-slim
 # 作業ディレクトリを作成・設定
 WORKDIR /app
 
+# netcat をインストール（DB起動確認に使用）
+RUN apt-get update && apt-get install -y netcat-openbsd && rm -rf /var/lib/apt/lists/*
+
 # 依存パッケージとアプリコードをコピー
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
