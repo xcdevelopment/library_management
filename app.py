@@ -100,34 +100,36 @@ def reset_admin_password_command():
         db.session.rollback()
         print(f"Error resetting admin password: {e}")
 
-def create_admin(app):
-    with app.app_context():
-        # 初期管理者ユーザーの作成
-        email = 'Development@xcap.co.jp'
-        password = 'adminpass'
-        # ユーザーが既に存在するか確認
-        if not User.query.filter_by(email=email).first():
-            admin = User(
-                email=email,
-                name='管理者',
-                is_admin=True
-            )
-            admin.set_password(password)
-            db.session.add(admin)
-            db.session.commit()
-            print(f'管理者アカウント {email} が作成されました。')
+@click.command('create-admin')
+@with_appcontext
+def create_admin_command():
+    """初期管理者ユーザーを作成します。"""
+    # ユーザーが既に存在するか確認
+    email = os.environ.get('ADMIN_EMAIL', 'Development@xcap.co.jp')
+    password = os.environ.get('ADMIN_PASSWORD', 'adminpass')
+    
+    if not User.query.filter_by(email=email).first():
+        admin = User(
+            email=email,
+            name='管理者',
+            is_admin=True
+        )
+        admin.set_password(password)
+        db.session.add(admin)
+        db.session.commit()
+        print(f'管理者アカウント {email} が作成されました。')
 
-            # ログ記録
-            log = OperationLog(
-                user_id=admin.id,
-                action='admin_created',
-                target=f'User: {admin.email}',
-                ip_address='localhost' # システムによる自動作成
-            )
-            db.session.add(log)
-            db.session.commit()
-        else:
-            print(f'管理者アカウント {email} は既に存在します。')
+        # ログ記録
+        log = OperationLog(
+            user_id=admin.id,
+            action='admin_created',
+            target=f'User: {admin.email}',
+            ip_address='localhost' # システムによる自動作成
+        )
+        db.session.add(log)
+        db.session.commit()
+    else:
+        print(f'管理者アカウント {email} は既に存在します。')
 
 def create_app(config_name=None):
     """アプリケーションファクトリ"""
@@ -234,10 +236,6 @@ def create_app(config_name=None):
     Bootstrap(app)
     migrate = Migrate(app, db)
     
-    # この時点でdbが初期化されているので、管理者を作成できる
-    with app.app_context():
-        create_admin(app)
-
     # メール初期化
     mail.init_app(app)
     
@@ -265,14 +263,19 @@ def create_app(config_name=None):
         app.logger.setLevel(logging.INFO)
         app.logger.info('Library startup')
     
-    # ブループリント登録
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(books_bp)
-    app.register_blueprint(users_bp)
-    app.register_blueprint(admin_bp)
-    app.register_blueprint(reservations_bp)
-    app.register_blueprint(api_bp)
-    
+    # Blueprintの登録
+    app.register_blueprint(auth_bp, url_prefix='/auth')
+    app.register_blueprint(books_bp, url_prefix='/books')
+    app.register_blueprint(users_bp, url_prefix='/users')
+    app.register_blueprint(admin_bp, url_prefix='/admin')
+    app.register_blueprint(reservations_bp, url_prefix='/reservations')
+    app.register_blueprint(api_bp, url_prefix='/api')
+
+    # カスタムCLIコマンドの登録
+    app.cli.add_command(init_db_command)
+    app.cli.add_command(reset_admin_password_command)
+    app.cli.add_command(create_admin_command) # 新しいコマンドを登録
+
     # レート制限の設定
     limiter = Limiter(
         app=app,
@@ -314,10 +317,6 @@ def create_app(config_name=None):
         if not request.is_secure and is_production:
             url = request.url.replace('http://', 'https://', 1)
             return redirect(url, code=301)
-    
-    # Flask CLI コマンドの登録
-    app.cli.add_command(init_db_command)
-    app.cli.add_command(reset_admin_password_command)
 
     return app
 

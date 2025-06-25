@@ -13,5 +13,9 @@ echo "Database started"
 echo "Running database migrations..."
 flask db upgrade
 
+# 初期管理者ユーザーを作成（存在しない場合のみ）
+echo "Creating initial admin user..."
+flask create-admin
+
 # アプリケーションを起動
 exec "$@"
