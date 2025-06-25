@@ -104,13 +104,13 @@ def logout():
     
     # 操作ログの記録
     try:
-        log = OperationLog(
+        op_log = OperationLog(
             user_id=current_user.id,
             action='logout',
             target=f'user: {current_user.email}',
             ip_address=request.remote_addr
         )
-        db.session.add(log)
+        db.session.add(op_log)
         db.session.commit()
     except Exception as e:
         current_app.logger.error(f"Failed to log logout operation: {e}")
@@ -139,13 +139,13 @@ def signup():
         db.session.commit() # user.id を確定させるために一度コミット
 
         # 操作ログの記録
-        log = OperationLog(
+        op_log = OperationLog(
             user_id=user.id,
             action='signup',
             target=f'User: {user.email}',
             ip_address=request.remote_addr
         )
-        db.session.add(log)
+        db.session.add(op_log)
         db.session.commit()
         
         flash('ユーザー登録が完了しました。ログインしてください。', 'success')

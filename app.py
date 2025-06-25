@@ -100,36 +100,34 @@ def reset_admin_password_command():
         db.session.rollback()
         print(f"Error resetting admin password: {e}")
 
-@click.command('create-admin')
-@with_appcontext
-def create_admin_command():
-    """初期管理者ユーザーを作成します。"""
-    # ユーザーが既に存在するか確認
-    email = os.environ.get('ADMIN_EMAIL', 'Development@xcap.co.jp')
-    password = os.environ.get('ADMIN_PASSWORD', 'adminpass')
-    
-    if not User.query.filter_by(email=email).first():
-        admin = User(
-            email=email,
-            name='管理者',
-            is_admin=True
-        )
-        admin.set_password(password)
-        db.session.add(admin)
-        db.session.commit()
-        print(f'管理者アカウント {email} が作成されました。')
+def create_admin(app):
+    with app.app_context():
+        # 初期管理者ユーザーの作成
+        email = 'Development@xcap.co.jp'
+        password = 'adminpass'
+        # ユーザーが既に存在するか確認
+        if not User.query.filter_by(email=email).first():
+            admin = User(
+                email=email,
+                name='管理者',
+                is_admin=True
+            )
+            admin.set_password(password)
+            db.session.add(admin)
+            db.session.commit()
+            print(f'管理者アカウント {email} が作成されました。')
 
-        # ログ記録
-        log = OperationLog(
-            user_id=admin.id,
-            action='admin_created',
-            target=f'User: {admin.email}',
-            ip_address='localhost' # システムによる自動作成
-        )
-        db.session.add(log)
-        db.session.commit()
-    else:
-        print(f'管理者アカウント {email} は既に存在します。')
+            # ログ記録
+            log = OperationLog(
+                user_id=admin.id,
+                action='admin_created',
+                target=f'User: {admin.email}',
+                ip_address='localhost' # システムによる自動作成
+            )
+            db.session.add(log)
+            db.session.commit()
+        else:
+            print(f'管理者アカウント {email} は既に存在します。')
 
 def create_app(config_name=None):
     """アプリケーションファクトリ"""
