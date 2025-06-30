@@ -12,6 +12,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - library_network
 
   db:
     image: mysql:8.0
@@ -29,7 +31,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - library_network
 
 volumes:
   db-data:
     name: db-data
+
+networks:
+  library_network:
+    driver: bridge
