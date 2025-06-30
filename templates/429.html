@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}レート制限 - 図書管理システム{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark text-center">
+                    <h4><i class="fas fa-exclamation-triangle"></i> アクセス制限</h4>
+                </div>
+                <div class="card-body text-center">
+                    <p>アクセス頻度が制限に達しました。</p>
+                    <p>しばらく時間をおいてから再度お試しください。</p>
+                    <a href="{{ url_for('home.dashboard') }}" class="btn btn-primary">
+                        <i class="fas fa-home"></i> ホームに戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
