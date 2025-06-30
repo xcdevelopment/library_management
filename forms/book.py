@@ -1,6 +1,7 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField
 from wtforms.validators import DataRequired
+from models import CategoryLocationMapping
 
 # 分類の定義
 CATEGORIES = {
@@ -69,4 +70,14 @@ class BookForm(FlaskForm):
     ], validators=[DataRequired()])
     category2 = SelectField('第２分類', choices=[('', '選択してください')])
     keywords = StringField('キーワード')
-    location = StringField('配置場所') 
+    location = SelectField('配置場所', choices=[])
+    
+    def populate_location_choices(self):
+        """全ての利用可能な場所選択肢を設定"""
+        locations = CategoryLocationMapping.query.with_entities(
+            CategoryLocationMapping.default_location
+        ).distinct().all()
+        
+        location_choices = [('', '選択してください')]
+        location_choices.extend([(loc.default_location, loc.default_location) for loc in locations])
+        self.location.choices = location_choices 

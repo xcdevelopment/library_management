@@ -1,0 +1,341 @@
+{% extends 'base.html' %}
+
+{% block title %}ホーム - 図書管理システム{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 class="mb-4">
+                <i class="fas fa-home"></i> ようこそ、{{ current_user.name }}さん
+            </h1>
+        </div>
+    </div>
+
+    <!-- アラート表示 -->
+    {% if alerts %}
+    <div class="row mb-4">
+        <div class="col-md-12">
+            {% for alert in alerts %}
+            <div class="alert alert-{{ alert.type }} alert-dismissible fade show" role="alert">
+                <i class="fas fa-exclamation-triangle"></i>
+                {{ alert.message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 管理者からのお知らせ（最優先表示） -->
+    {% if announcements %}
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bullhorn"></i> 管理者からのお知らせ
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for announcement in announcements %}
+                    <div class="alert priority-{{ announcement.priority }}{% if not loop.last %} mb-3{% else %} mb-0{% endif %}" role="alert">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="alert-heading mb-2">
+                                    {% if announcement.priority == 'high' %}
+                                    <i class="fas fa-exclamation-triangle text-danger"></i>
+                                    {% elif announcement.priority == 'medium' %}
+                                    <i class="fas fa-info-circle text-warning"></i>
+                                    {% else %}
+                                    <i class="fas fa-info-circle text-info"></i>
+                                    {% endif %}
+                                    {{ announcement.title }}
+                                    <span class="badge priority-badge-{{ announcement.priority }} ms-2">
+                                        {% if announcement.priority == 'high' %}高{% elif announcement.priority == 'medium' %}中{% else %}低{% endif %}
+                                    </span>
+                                </h6>
+                                <div style="white-space: pre-line;">{{ announcement.content }}</div>
+                                <hr class="mt-3 mb-2">
+                                <small class="text-muted">
+                                    <i class="fas fa-user"></i> {{ announcement.creator.name }} - 
+                                    <i class="fas fa-calendar"></i> {{ announcement.created_at.strftime('%Y年%m月%d日') }}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- アラート表示（システムアラート） -->
+
+    <div class="row">
+        <!-- 左側のカラム：貸出状況と予約状況 -->
+        <div class="col-md-8">
+            <!-- 現在の貸出状況 -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-book-reader"></i> 
+                        現在の貸出状況 ({{ current_loans|length }}/{{ max_loans }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if current_loans %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>書籍名</th>
+                                    <th>著者</th>
+                                    <th>貸出日</th>
+                                    <th>返却期限</th>
+                                    <th>状態</th>
+                                    <th style="width: 150px;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for loan in current_loans %}
+                                <tr class="{% if loan in overdue %}table-danger{% elif loan in due_soon %}table-warning{% endif %}">
+                                    <td>
+                                        <a href="{{ url_for('books.book_detail', book_id=loan.book.id) }}" class="text-decoration-none">
+                                            {{ loan.book.title }}
+                                        </a>
+                                    </td>
+                                    <td>{{ loan.book.author }}</td>
+                                    <td>{{ loan.loan_date.strftime('%Y/%m/%d') }}</td>
+                                    <td>
+                                        {{ loan.due_date.strftime('%Y/%m/%d') if loan.due_date else 'N/A' }}
+                                        {% if loan in overdue %}
+                                        <span class="badge bg-danger ms-1">期限切れ</span>
+                                        {% elif loan in due_soon %}
+                                        <span class="badge bg-warning ms-1">期限間近</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if loan.extension_count > 0 %}
+                                        <span class="badge bg-info">延長済み</span>
+                                        {% else %}
+                                        <span class="badge bg-success">通常</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="white-space: nowrap;">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{{ url_for('books.extend_loan', loan_id=loan.id) }}" 
+                                               class="btn btn-outline-primary btn-sm">
+                                                <i class="fas fa-clock"></i> 延長
+                                            </a>
+                                            <form method="POST" action="{{ url_for('books.return_book_route', book_id=loan.book.id) }}" 
+                                                  style="display: inline-block;">
+                                                {{ csrf_form.csrf_token }}
+                                                <button type="submit" class="btn btn-outline-success btn-sm"
+                                                        onclick="return confirm('この本を返却しますか？')">
+                                                    <i class="fas fa-undo"></i> 返却
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-book fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">現在借りている本はありません</p>
+                        <a href="{{ url_for('books.index') }}" class="btn btn-primary">
+                            <i class="fas fa-search"></i> 本を探す
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 予約状況 -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-check"></i> 予約状況
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if current_reservations %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th style="width: 30%;">書籍名</th>
+                                    <th style="width: 20%;">著者</th>
+                                    <th style="width: 15%;">予約日</th>
+                                    <th style="width: 15%;">順番</th>
+                                    <th style="width: 20%;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for reservation in current_reservations %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('books.book_detail', book_id=reservation.book.id) }}" class="text-decoration-none">
+                                            {{ reservation.book.title }}
+                                        </a>
+                                    </td>
+                                    <td>{{ reservation.book.author }}</td>
+                                    <td>{{ reservation.reservation_date.strftime('%Y/%m/%d') }}</td>
+                                    <td>
+                                        {% if reservation.queue_position %}
+                                            {% if reservation.queue_position == 1 and (reservation.book.status.value == '利用可能' or reservation.book.status.value == '予約あり') %}
+                                            <span class="badge bg-success">貸出可能</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">{{ reservation.queue_position }}番目</span>
+                                            {% endif %}
+                                        {% else %}
+                                        <span class="badge bg-warning">順位計算中</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if reservation.queue_position == 1 and (reservation.book.status.value == '利用可能' or reservation.book.status.value == '予約あり') and available_loan_slots > 0 %}
+                                        <div class="d-flex gap-1" style="white-space: nowrap;">
+                                            <form method="POST" action="{{ url_for('reservations.borrow_from_reservation', reservation_id=reservation.id) }}" class="d-inline">
+                                                {{ csrf_form.csrf_token }}
+                                                <button type="submit" class="btn btn-success btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
+                                                        onclick="return confirm('この本を借りますか？')">
+                                                    <i class="fas fa-book"></i> 借りる
+                                                </button>
+                                            </form>
+                                            <form method="POST" action="{{ url_for('reservations.cancel', id=reservation.id) }}" class="d-inline">
+                                                {{ csrf_form.csrf_token }}
+                                                <button type="submit" class="btn btn-outline-danger btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
+                                                        onclick="return confirm('予約をキャンセルしますか？')">
+                                                    <i class="fas fa-times"></i> キャンセル
+                                                </button>
+                                            </form>
+                                        </div>
+                                        {% else %}
+                                        <form method="POST" action="{{ url_for('reservations.cancel', id=reservation.id) }}" class="d-inline">
+                                            {{ csrf_form.csrf_token }}
+                                            <button type="submit" class="btn btn-outline-danger btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
+                                                    onclick="return confirm('予約をキャンセルしますか？')">
+                                                <i class="fas fa-times"></i> キャンセル
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">現在予約している本はありません</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 右側のカラム：統計情報と新着情報 -->
+        <div class="col-md-4">
+            <!-- 貸出状況サマリー -->
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-pie"></i> 貸出状況
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border-end">
+                                <h3 class="text-primary">{{ current_loans|length }}</h3>
+                                <small class="text-muted">貸出中</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <h3 class="text-success">{{ available_loan_slots }}</h3>
+                            <small class="text-muted">貸出可能</small>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="progress mb-2">
+                        <div class="progress-bar" role="progressbar" 
+                             style="width: {{ (current_loans|length / max_loans * 100)|round }}%">
+                        </div>
+                    </div>
+                    <small class="text-muted">最大 {{ max_loans }} 冊まで借りられます</small>
+                </div>
+            </div>
+
+            <!-- 人気の本 -->
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-fire"></i> 人気の本
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if popular_books %}
+                    <div class="list-group list-group-flush">
+                        {% for book in popular_books %}
+                        <div class="list-group-item border-0 px-0">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">
+                                        <a href="{{ url_for('books.book_detail', book_id=book.id) }}" class="text-decoration-none">
+                                            {{ book.title }}
+                                        </a>
+                                    </h6>
+                                    <small class="text-muted">{{ book.author }}</small>
+                                </div>
+                                <span class="badge bg-primary rounded-pill">{{ book.loan_count }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">データがありません</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 新着図書 -->
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-star"></i> 新着図書
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_books %}
+                    <div class="list-group list-group-flush">
+                        {% for book in recent_books %}
+                        <div class="list-group-item border-0 px-0">
+                            <h6 class="mb-1">
+                                <a href="{{ url_for('books.book_detail', book_id=book.id) }}" class="text-decoration-none">
+                                    {{ book.title }}
+                                </a>
+                            </h6>
+                            <small class="text-muted">{{ book.author }}</small>
+                            {% if book.status.value == '利用可能' %}
+                            <span class="badge bg-success ms-1">貸出可能</span>
+                            {% else %}
+                            <span class="badge bg-danger ms-1">貸出中</span>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">新着図書がありません</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

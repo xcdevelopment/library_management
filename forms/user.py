@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField, BooleanField
-from wtforms.validators import DataRequired, Length, Email, EqualTo, Optional, ValidationError
+from wtforms import StringField, PasswordField, SubmitField, BooleanField, IntegerField
+from wtforms.validators import DataRequired, Length, Email, EqualTo, Optional, ValidationError, NumberRange
 from models import User
 
 class ProfileForm(FlaskForm):
@@ -31,6 +31,10 @@ class NewUserForm(FlaskForm):
     name = StringField('氏名', validators=[DataRequired(), Length(max=100)])
     email = StringField('メールアドレス', validators=[DataRequired(), Email()])
     password = PasswordField('パスワード', validators=[DataRequired(), Length(min=8, message='パスワードは8文字以上で入力してください。')])
+    max_loan_limit = IntegerField('最大貸出数', validators=[
+        DataRequired(message='最大貸出数を入力してください'),
+        NumberRange(min=1, max=10, message='最大貸出数は1冊以上10冊以下で設定してください')
+    ], default=3)
     is_admin = BooleanField('管理者権限')
     submit = SubmitField('作成する')
 
@@ -42,6 +46,10 @@ class EditUserForm(FlaskForm):
     """管理者用 - ユーザー編集フォーム"""
     name = StringField('氏名', validators=[DataRequired(), Length(max=100)])
     email = StringField('メールアドレス', validators=[DataRequired(), Email()])
+    max_loan_limit = IntegerField('最大貸出数', validators=[
+        DataRequired(message='最大貸出数を入力してください'),
+        NumberRange(min=1, max=10, message='最大貸出数は1冊以上10冊以下で設定してください')
+    ], default=3)
     is_admin = BooleanField('管理者権限')
     password = PasswordField('新しいパスワード', validators=[Optional(), Length(min=8, message='パスワードは8文字以上で入力してください。')])
     submit = SubmitField('更新する')

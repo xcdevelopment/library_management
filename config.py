@@ -48,6 +48,8 @@ class DevelopmentConfig(Config):
     DEBUG = True
     SQLALCHEMY_DATABASE_URI = os.environ.get('DEV_DATABASE_URL') or \
         'mysql+pymysql://root:password@db/library_dev'
+    # SERVER_NAME = os.environ.get('SERVER_NAME')  # コメントアウトして柔軟性を向上
+    PREFERRED_URL_SCHEME = 'http'
 
 class TestingConfig(Config):
     """テスト環境設定"""

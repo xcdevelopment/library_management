@@ -30,7 +30,7 @@ def login():
         # ★★★ デバッグログ追加 ★★★
         log.info(f"User already authenticated: {current_user.email}. Redirecting.")
         # ★★★★★★★★★★★★★★★★
-        return redirect(url_for('books.index'))
+        return redirect(url_for('home.dashboard'))
 
     form = LoginForm()
     if form.validate_on_submit():
@@ -81,7 +81,7 @@ def login():
                 db.session.rollback()
 
             next_page = request.args.get('next')
-            return redirect(next_page) if next_page else redirect(url_for('books.index'))
+            return redirect(next_page) if next_page else redirect(url_for('home.dashboard'))
 
         except Exception as e:
             # ★★★ デバッグログ追加 ★★★
@@ -124,7 +124,7 @@ def logout():
 def signup():
     """サインアップ処理"""
     if current_user.is_authenticated:
-        return redirect(url_for('books.index'))
+        return redirect(url_for('home.dashboard'))
     
     form = SignupForm()
     if form.validate_on_submit():

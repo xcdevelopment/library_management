@@ -10,10 +10,12 @@ import chardet
 import requests
 
 from models import Book, LoanHistory, Reservation, OperationLog, db, User, ReservationStatus, BookStatus
-from services.book_service import borrow_book, return_book, reserve_book, cancel_reservation
+from services.book_service import borrow_book, return_book, reserve_book, cancel_reservation, create_book_with_auto_number, update_book_status
+from services.loan_service import LoanService
 from services.slack_service import send_slack_dm_to_user
 from forms.search import SearchForm
 from forms.book import BookForm, CATEGORIES
+from forms.book_forms import BorrowForm, ExtendLoanForm
 
 books_bp = Blueprint('books', __name__, url_prefix='/books')
 
@@ -73,7 +75,7 @@ def book_detail(book_id):
     # 現在の予約状況
     reservations = Reservation.query.filter_by(
         book_id=book.id,
-        status='pending'
+        status=ReservationStatus.PENDING
     ).order_by(Reservation.reservation_date).all()
     
     # 貸出履歴
@@ -83,7 +85,7 @@ def book_detail(book_id):
     user_reservation = Reservation.query.filter_by(
         book_id=book.id,
         user_id=current_user.id,
-        status='pending'
+        status=ReservationStatus.PENDING
     ).first()
     
     return render_template(
@@ -94,47 +96,71 @@ def book_detail(book_id):
         user_reservation=user_reservation
     )
 
-@books_bp.route('/book/borrow/<int:book_id>', methods=['POST'])
+@books_bp.route('/book/borrow/<int:book_id>', methods=['GET', 'POST'])
 @login_required
 def borrow(book_id):
     """書籍を借りる処理"""
-    success, result = borrow_book(book_id, current_user.id)
+    book = Book.query.get_or_404(book_id)
+    form = BorrowForm()
     
-    if success:
-        flash('本を借りました。', 'success')
+    if form.validate_on_submit():
+        # 返却期限を計算
+        due_date = None
+        if form.due_date_option.data == 'today':
+            due_date = datetime.utcnow()
+        elif form.due_date_option.data == '1week':
+            due_date = datetime.utcnow() + timedelta(weeks=1)
+        elif form.due_date_option.data == '2weeks':
+            due_date = datetime.utcnow() + timedelta(weeks=2)
+        elif form.due_date_option.data == 'custom' and form.custom_due_date.data:
+            due_date = datetime.combine(form.custom_due_date.data, datetime.min.time())
         
-        # 貸出記録を取得
-        loan = LoanHistory.query.filter_by(
-            book_id=book_id,
-            borrower_id=current_user.id,
-            return_date=None
-        ).first()
+        success, result = borrow_book(book_id, current_user.id, due_date)
         
-        # Slack通知を送信
-        if loan and loan.book:
-            book_url = url_for('books.book_detail', book_id=book_id, _external=True)
-            message = (
-                f"図書管理アプリです！以下の本の貸出がされました。\n"
-                f"書籍：<{book_url}|{loan.book.title}>\n"
-                f"返却期限：{loan.due_date.strftime('%Y-%m-%d')}\n\n"
-                f"返却期限を守り、書籍は元の場所へ返却するようお願いいたします。"
+        if success:
+            flash('本を借りました。', 'success')
+            
+            # 貸出記録を取得
+            loan = LoanHistory.query.filter_by(
+                book_id=book_id,
+                borrower_id=current_user.id,
+                return_date=None
+            ).first()
+            
+            # Slack通知を送信
+            if loan and loan.book:
+                book_url = f"http://localhost/books/book/{book_id}"
+                message = (
+                    f"図書管理アプリです！以下の本の貸出がされました。\n"
+                    f"書籍：<{book_url}|{loan.book.title}>\n"
+                    f"返却期限：{loan.due_date.strftime('%Y-%m-%d')}\n\n"
+                    f"返却期限を守り、書籍は元の場所へ返却するようお願いいたします。"
+                )
+                # 貸し出した本人にDMを送信
+                send_slack_dm_to_user(current_user, message)
+            
+            # 書籍の状態を更新
+            book = Book.query.get(book_id)
+            update_book_status(book)
+            
+            # 操作ログの記録
+            log = OperationLog(
+                user_id=current_user.id,
+                action='borrow_book',
+                target=f'Book {book_id}',
+                ip_address=request.remote_addr
             )
-            # 貸し出した本人にDMを送信
-            send_slack_dm_to_user(current_user, message)
-        
-        # 操作ログの記録
-        log = OperationLog(
-            user_id=current_user.id,
-            action='borrow_book',
-            target=f'Book {book_id}',
-            ip_address=request.remote_addr
-        )
-        db.session.add(log)
-        db.session.commit()
-    else:
-        flash(result, 'danger')
+            db.session.add(log)
+            db.session.commit()
+            
+            return redirect(url_for('books.book_detail', book_id=book_id))
+        else:
+            flash(result, 'danger')
     
-    return redirect(url_for('books.book_detail', book_id=book_id))
+    # 貸出可能性チェック
+    can_borrow, error_msg = LoanService.can_user_borrow_book(current_user.id, book_id)
+    
+    return render_template('books/borrow.html', book=book, form=form, can_borrow=can_borrow, error_msg=error_msg)
 
 @books_bp.route('/book/return/<int:book_id>', methods=['POST'])
 @login_required
@@ -154,7 +180,7 @@ def return_book_route(book_id):
         return redirect(url_for('books.book_detail', book_id=book_id))
     
     # Slack通知 (返却)
-    book_url = url_for('books.book_detail', book_id=book_id, _external=True)
+    book_url = f"http://localhost/books/book/{book_id}"
     return_message = (
         f"図書管理アプリです！以下の本が返却されました。\n"
         f"書籍：<{book_url}|{book.title}>\n"
@@ -166,11 +192,10 @@ def return_book_route(book_id):
 
     # 返却日時を設定
     loan.return_date = datetime.utcnow()
+    db.session.commit()  # まず返却日を保存
     
-    # 書籍の状態を更新
-    book.status = BookStatus.AVAILABLE
-    book.is_available = True
-    book.borrower_id = None
+    # 書籍の状態を適切に更新（予約状況も考慮）
+    update_book_status(book)
     
     # 予約者への通知
     next_reservation = Reservation.query.filter_by(
@@ -185,7 +210,7 @@ def return_book_route(book_id):
         next_reservation.notification_sent = True
         
         # Slack通知 (予約者に利用可能)
-        book_url = url_for('books.book_detail', book_id=book_id, _external=True)
+        book_url = f"http://localhost/books/book/{book_id}"
         reservation_message = (
             f"図書管理アプリです！ご予約の本がご用意できました。\n"
             f"書籍：<{book_url}|{book.title}>\n"
@@ -220,7 +245,7 @@ def reserve(book_id):
     
     if success:
         book = Book.query.get_or_404(book_id)
-        book_url = url_for('books.book_detail', book_id=book_id, _external=True)
+        book_url = f"http://localhost/books/book/{book_id}"
         message = (
             f"図書管理アプリです！以下の本を予約しました。\n"
             f"書籍：<{book_url}|{book.title}>\n\n"
@@ -254,7 +279,7 @@ def cancel(reservation_id):
     success, result = cancel_reservation(reservation_id, current_user.id)
     
     if success:
-        book_url = url_for('books.book_detail', book_id=book_id, _external=True)
+        book_url = f"http://localhost/books/book/{book_id}"
         message = (
             f"図書管理アプリです！以下の本の予約をキャンセルしました。\n"
             f"書籍：<{book_url}|{reservation.book.title}>"
@@ -286,8 +311,10 @@ def add():
         return redirect(url_for('books.index'))
     
     form = BookForm()
+    form.populate_location_choices()  # 場所の選択肢を設定
     if form.validate_on_submit():
-        book = Book(
+        # 自動管理番号とカテゴリベース自動ロケーション機能を使用
+        book = create_book_with_auto_number(
             title=form.title.data,
             author=form.author.data,
             category1=form.category1.data,
@@ -295,8 +322,6 @@ def add():
             keywords=form.keywords.data,
             location=form.location.data
         )
-        
-        db.session.add(book)
         
         # 操作ログの記録
         log = OperationLog(
@@ -322,7 +347,7 @@ def my_books():
     # 自分の予約一覧
     reservations = Reservation.query.filter_by(
         user_id=current_user.id,
-        status='pending'
+        status=ReservationStatus.PENDING
     ).order_by(Reservation.reservation_date).all()
     
     return render_template('books/my_books.html', borrowed_books=borrowed_books, reservations=reservations)
@@ -388,15 +413,41 @@ def import_books():
                                 error_count += 1
                                 continue
 
-                            book = Book(
-                                title=title,
-                                author=author,
-                                category1=row.get('category1', '').strip(),
-                                category2=row.get('category2', '').strip(),
-                                keywords=row.get('keywords', '').strip(),
-                                location=row.get('location', '').strip()
-                            )
-                            books_to_add.append(book)
+                            # 場所の妥当性チェック
+                            location = row.get('location', '').strip()
+                            category1 = row.get('category1', '').strip()
+                            
+                            if location and category1:
+                                # 指定されたカテゴリに対して設定されている場所かチェック
+                                from models import CategoryLocationMapping
+                                valid_location = CategoryLocationMapping.query.filter_by(
+                                    category1=category1, 
+                                    default_location=location
+                                ).first()
+                                
+                                if not valid_location:
+                                    # このカテゴリで使用可能な場所を取得
+                                    available_locations = CategoryLocationMapping.query.filter_by(
+                                        category1=category1
+                                    ).all()
+                                    if available_locations:
+                                        location_list = [loc.default_location for loc in available_locations]
+                                        errors.append(f'行 {row_num}: カテゴリ「{category1}」には場所「{location}」は設定されていません。使用可能な場所: {", ".join(location_list)}')
+                                    else:
+                                        errors.append(f'行 {row_num}: カテゴリ「{category1}」には場所が設定されていません。')
+                                    error_count += 1
+                                    continue
+
+                            # CSVインポート用: 書籍オブジェクトを準備（自動番号は後で一括生成）
+                            book_data = {
+                                'title': title,
+                                'author': author,
+                                'category1': category1,
+                                'category2': row.get('category2', '').strip(),
+                                'keywords': row.get('keywords', '').strip(),
+                                'location': location
+                            }
+                            books_to_add.append(book_data)
                             
                         except Exception as e:
                             error_count += 1
@@ -411,11 +462,13 @@ def import_books():
                         flash(f'他 {len(errors) - 10} 件のエラーがあります。', 'warning')
                     return redirect(url_for('books.import_books'))
 
-                # エラーがなければ一括でコミット
+                # エラーがなければ一括でコミット（自動番号生成付き）
                 if books_to_add:
-                    db.session.add_all(books_to_add)
-                    db.session.commit()
-                    success_count = len(books_to_add)
+                    created_books = []
+                    for book_data in books_to_add:
+                        book = create_book_with_auto_number(**book_data)
+                        created_books.append(book)
+                    success_count = len(created_books)
                     
                     # 操作ログの記録
                     log = OperationLog(
@@ -497,3 +550,84 @@ def edit_book(book_id):
         return redirect(url_for('books.book_detail', book_id=book.id))
 
     return render_template('books/edit.html', form=form, book=book)
+
+@books_bp.route('/loan/extend/<int:loan_id>', methods=['GET', 'POST'])
+@login_required
+def extend_loan(loan_id):
+    """貸出期間を延長する"""
+    loan = LoanHistory.query.get_or_404(loan_id)
+    
+    # 権限チェック
+    if loan.borrower_id != current_user.id and not current_user.is_admin:
+        flash('この貸出記録を延長する権限がありません。', 'danger')
+        return redirect(url_for('books.my_books'))
+    
+    # 既に返却済みかチェック
+    if loan.return_date:
+        flash('この本は既に返却されています。', 'warning')
+        return redirect(url_for('books.my_books'))
+    
+    form = ExtendLoanForm()
+    
+    if form.validate_on_submit():
+        extension_weeks = int(form.extension_period.data)
+        success, message = LoanService.extend_loan(loan_id, extension_weeks)
+        
+        if success:
+            flash(message, 'success')
+            
+            # Slack通知
+            book_url = f"http://localhost/books/book/{loan.book_id}"
+            slack_message = (
+                f"図書管理アプリです！貸出期間が延長されました。\n"
+                f"書籍：<{book_url}|{loan.book.title}>\n"
+                f"新しい返却期限：{loan.due_date.strftime('%Y-%m-%d')}\n\n"
+                f"返却期限を守り、返却の際、本は自分で戻してください。"
+            )
+            send_slack_dm_to_user(current_user, slack_message)
+            
+            # 操作ログの記録
+            log = OperationLog(
+                user_id=current_user.id,
+                action='extend_loan',
+                target=f'Loan {loan_id}',
+                ip_address=request.remote_addr
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            return redirect(url_for('books.my_books'))
+        else:
+            flash(message, 'danger')
+    
+    # 延長可能性チェック
+    can_extend = loan.can_extend()
+    error_msg = ""
+    if not can_extend:
+        if loan.extension_count >= 1:
+            error_msg = "既に延長回数の上限(1回)に達しています。"
+        else:
+            active_reservations = [r for r in loan.book.reservations if r.status == ReservationStatus.PENDING]
+            if active_reservations:
+                error_msg = "この本には予約者がいるため延長できません。"
+    
+    return render_template('books/extend_loan.html', 
+                         loan=loan, 
+                         form=form, 
+                         can_extend=can_extend, 
+                         error_msg=error_msg)
+
+@books_bp.route('/loans/due-soon')
+@login_required
+def loans_due_soon():
+    """返却期限が近い貸出一覧（管理者用）"""
+    if not current_user.is_admin:
+        flash('この機能は管理者のみ利用できます。', 'danger')
+        return redirect(url_for('books.index'))
+    
+    due_soon_loans = LoanService.get_due_soon_loans(days=3)
+    overdue_loans = LoanService.get_overdue_loans()
+    
+    return render_template('admin/loans_status.html', 
+                         due_soon_loans=due_soon_loans, 
+                         overdue_loans=overdue_loans)

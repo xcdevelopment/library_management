@@ -1,0 +1,5 @@
+2025-06-28 17:41:01,751 - scheduled_tasks - ERROR - Error sending reminder for loan 3: Unable to build URLs outside an active request without 'SERVER_NAME' configured. Also configure 'APPLICATION_ROOT' and 'PREFERRED_URL_SCHEME' as needed.
+2025-06-28 17:41:01,753 - scheduled_tasks - INFO - 送信すべき返却期限リマインダーはありませんでした
+2025-06-28 17:42:54,464 - services.slack_service - INFO - Successfully sent DM to user U08H9E7RX0C
+2025-06-28 17:42:54,482 - scheduled_tasks - INFO - Due date reminder sent for loan 3
+2025-06-28 17:42:54,482 - scheduled_tasks - INFO - 返却期限リマインダーを 1 件送信しました

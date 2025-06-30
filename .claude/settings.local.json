@@ -4,7 +4,14 @@
       "Bash(docker-compose logs:*)",
       "Bash(docker-compose exec:*)",
       "Bash(docker-compose build:*)",
-      "Bash(docker-compose up:*)"
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose:*)",
+      "Bash(curl:*)",
+      "Bash(mkdir:*)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_install",
+      "Bash(grep:*)",
+      "Bash(rg:*)"
     ],
     "deny": []
   }

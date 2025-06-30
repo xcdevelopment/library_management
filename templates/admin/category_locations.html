@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}カテゴリ-場所設定{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <i class="fas fa-map-marker-alt"></i> カテゴリ-場所設定
+        </h1>
+        <a href="{{ url_for('admin.new_category_location') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> 新規作成
+        </a>
+    </div>
+
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        <strong>説明:</strong> 第１分類に応じて自動的に割り当てられる場所を設定できます。新しい書籍登録時に場所が未入力の場合、この設定に基づいて自動入力されます。
+    </div>
+
+    {% if mappings %}
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>第１分類</th>
+                    <th>デフォルト場所</th>
+                    <th>作成日</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for mapping in mappings %}
+                <tr>
+                    <td>
+                        <span class="badge bg-primary">{{ mapping.category1 }}</span>
+                    </td>
+                    <td>{{ mapping.default_location }}</td>
+                    <td>{{ mapping.created_at.strftime('%Y/%m/%d') }}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <a href="{{ url_for('admin.edit_category_location', mapping_id=mapping.id) }}" 
+                               class="btn btn-outline-primary">
+                                <i class="fas fa-edit"></i> 編集
+                            </a>
+                            <form method="POST" action="{{ url_for('admin.delete_category_location', mapping_id=mapping.id) }}" 
+                                  style="display: inline-block;"
+                                  onsubmit="return confirm('この設定を削除しますか？')">
+                                <button type="submit" class="btn btn-outline-danger">
+                                    <i class="fas fa-trash"></i> 削除
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+        <i class="fas fa-map-marker-alt fa-3x text-muted mb-3"></i>
+        <p class="text-muted">カテゴリ-場所設定がありません</p>
+        <a href="{{ url_for('admin.new_category_location') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> 最初の設定を作成
+        </a>
+    </div>
+    {% endif %}
+
+    {% if mappings %}
+    <div class="mt-4">
+        <h5>現在のマッピング例</h5>
+        <div class="row">
+            {% for mapping in mappings %}
+            <div class="col-md-4 mb-2">
+                <div class="card border-light">
+                    <div class="card-body p-2">
+                        <small class="text-muted">{{ mapping.category1 }}</small>
+                        <i class="fas fa-arrow-right mx-2"></i>
+                        <strong>{{ mapping.default_location }}</strong>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

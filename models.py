@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 import json
 from sqlalchemy.orm import validates
+from sqlalchemy import or_, and_
 
 db = SQLAlchemy()
 ph = PasswordHasher()
@@ -20,6 +21,7 @@ class User(db.Model, UserMixin):
     name = db.Column(db.String(100), nullable=False)  # 氏名
     is_admin = db.Column(db.Boolean, default=False)   # 権限（管理者かどうか）
     slack_user_id = db.Column(db.String(50), nullable=True)  # SlackユーザーIDを保存するカラム
+    max_loan_limit = db.Column(db.Integer, default=3, nullable=False)  # 最大同時貸出数
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -41,6 +43,28 @@ class User(db.Model, UserMixin):
         except Exception as e:
             print(f"Password verification error: {e}")
             return False
+    
+    def current_loan_count(self):
+        """現在の貸出数を取得"""
+        active_loans = [loan for loan in self.loans if loan.is_active]
+        return len(active_loans)
+    
+    def current_reservation_count(self):
+        """現在の予約数を取得"""
+        active_reservations = [r for r in self.reservations if r.status == ReservationStatus.PENDING]
+        return len(active_reservations)
+    
+    def can_borrow_more(self):
+        """追加で本を借りられるかどうかを確認"""
+        total_active = self.current_loan_count() + self.current_reservation_count()
+        return total_active < self.max_loan_limit
+    
+    def has_overdue_books(self):
+        """延滞中の本があるかどうかを確認"""
+        for loan in self.loans:
+            if loan.is_active and loan.is_overdue():
+                return True
+        return False
     
     def __repr__(self):
         return f'<User {self.email}>'
@@ -66,6 +90,7 @@ class Book(db.Model):
     __tablename__ = 'books'
     
     id = db.Column(db.Integer, primary_key=True)  # 番号
+    book_number = db.Column(db.String(20), unique=True, nullable=True, index=True)  # 管理番号 (BO-yyyy-001)
     title = db.Column(db.String(200), nullable=False, index=True)  # 書籍名
     status = db.Column(db.Enum(BookStatus), default=BookStatus.AVAILABLE, index=True)  # 状態を追加
     is_available = db.Column(db.Boolean, default=True, index=True)  # 貸出可否
@@ -76,12 +101,14 @@ class Book(db.Model):
     location = db.Column(db.String(100))  # 場所
     borrower_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # 借りた人
     borrower = db.relationship('User', backref=db.backref('borrowed_books', lazy=True))
+    registration_date = db.Column(db.DateTime, default=datetime.utcnow, index=True)  # 登録日
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     loans = db.relationship('LoanHistory', back_populates='book', lazy=True)
     reservations = db.relationship('Reservation', back_populates='book', lazy=True, cascade="all, delete-orphan")
+    images = db.relationship('BookImage', back_populates='book', lazy=True, cascade="all, delete-orphan")
     
     @property
     def current_loan(self):
@@ -119,6 +146,8 @@ class LoanHistory(db.Model):
     due_date = db.Column(db.DateTime, nullable=True, index=True)  # 返却期限日
     return_date = db.Column(db.DateTime, nullable=True, index=True)  # 返却日
     reminder_sent = db.Column(db.Boolean, default=False)  # 期限前リマインダー送信済み
+    extension_count = db.Column(db.Integer, default=0, nullable=False)  # 延長回数
+    extended_date = db.Column(db.DateTime, nullable=True)  # 延長実施日
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     @property
@@ -140,6 +169,21 @@ class LoanHistory(db.Model):
         now = datetime.utcnow()
         delta = self.due_date - now
         return delta.days
+    
+    def can_extend(self):
+        """延長可能かどうかを確認"""
+        # 既に返却済み
+        if self.return_date:
+            return False
+        # 延長回数が上限に達している
+        if self.extension_count >= 1:
+            return False
+        # 予約者がいる場合は延長不可
+        if self.book.reservations:
+            active_reservations = [r for r in self.book.reservations if r.status == ReservationStatus.PENDING]
+            if active_reservations:
+                return False
+        return True
     
     def __repr__(self):
         return f'<LoanHistory {self.book_title}>'
@@ -171,17 +215,21 @@ class Reservation(db.Model):
         if self.status != ReservationStatus.PENDING:
             return None
         
-        # 同じ本の有効な予約を予約日順で取得
-        reservations = Reservation.query.filter_by(
-            book_id=self.book_id,
-            status=ReservationStatus.PENDING
-        ).order_by(Reservation.reservation_date).all()
+        # 自分より前に予約された有効な予約の数を数える + 1
+        # 同じ時刻の場合はIDの小さい順
+        earlier_reservations_count = Reservation.query.filter(
+            Reservation.book_id == self.book_id,
+            Reservation.status == ReservationStatus.PENDING,
+            or_(
+                Reservation.reservation_date < self.reservation_date,
+                and_(
+                    Reservation.reservation_date == self.reservation_date,
+                    Reservation.id < self.id
+                )
+            )
+        ).count()
         
-        # 自分の位置を特定（1から始まる順位）
-        for i, reservation in enumerate(reservations, 1):
-            if reservation.id == self.id:
-                return i
-        return None
+        return earlier_reservations_count + 1
     
     def __repr__(self):
         return f'<Reservation {self.id} for Book {self.book_id} by User {self.user_id}>'
@@ -203,3 +251,57 @@ class OperationLog(db.Model):
     
     def __repr__(self):
         return f'<OperationLog {self.action}>'
+
+
+class Announcement(db.Model):
+    """管理者お知らせテーブル"""
+    __tablename__ = 'announcements'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)  # お知らせタイトル
+    content = db.Column(db.Text, nullable=False)  # お知らせ内容
+    is_active = db.Column(db.Boolean, default=True, nullable=False)  # 表示フラグ
+    priority = db.Column(db.String(10), default='low', nullable=False)  # 優先度（low/medium/high）
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # 作成者
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship
+    creator = db.relationship('User', backref=db.backref('announcements', lazy=True))
+    
+    def __repr__(self):
+        return f'<Announcement {self.title}>'
+
+
+class CategoryLocationMapping(db.Model):
+    """分類場所マッピングテーブル"""
+    __tablename__ = 'category_location_mapping'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    category1 = db.Column(db.String(50), nullable=False, index=True)  # 第１分類
+    default_location = db.Column(db.String(100), nullable=False)  # デフォルト場所
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<CategoryLocationMapping {self.category1} -> {self.default_location}>'
+
+
+class BookImage(db.Model):
+    """書籍画像テーブル"""
+    __tablename__ = 'book_images'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    book_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False)
+    image_type = db.Column(db.String(20), nullable=False)  # 画像種類 (cover, contents, etc.)
+    file_path = db.Column(db.String(255), nullable=False)  # ファイルパス
+    file_name = db.Column(db.String(100), nullable=False)  # ファイル名
+    file_size = db.Column(db.Integer, nullable=False)  # ファイルサイズ（バイト）
+    mime_type = db.Column(db.String(50), nullable=False)  # MIMEタイプ
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationship
+    book = db.relationship('Book', back_populates='images')
+    
+    def __repr__(self):
+        return f'<BookImage {self.book_id}:{self.image_type}>'

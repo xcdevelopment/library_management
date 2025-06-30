@@ -66,13 +66,37 @@ def check_due_date_reminders(logger):
         try:
             days_remaining = (loan.due_date.date() - datetime.utcnow().date()).days
             
-            book_url = url_for('books.book_detail', book_id=loan.book_id, _external=True)
+            # URL生成を簡略化
+            base_url = 'http://localhost'
+            book_url = f"{base_url}/books/book/{loan.book_id}"
+            extend_url = f"{base_url}/books/loan/extend/{loan.id}"
+            
+            # 延長可能かチェック
+            can_extend = loan.extension_count == 0
+            reservation_count = Reservation.query.filter_by(book_id=loan.book_id, status='pending').count()
+            has_reservations = reservation_count > 0
+            
             message = (
-                f"図書管理アプリです！貸出中の本の返却期限が近づいています。\n"
-                f"書籍：<{book_url}|{loan.book.title}>\n"
-                f"返却期限：{loan.due_date.strftime('%Y-%m-%d')} ({days_remaining}日前)\n\n"
-                f"期限内のご返却にご協力をお願いいたします。"
+                f":books: *図書管理システム* - 返却期限のお知らせ\n\n"
+                f"*書籍：* <{book_url}|{loan.book.title}>\n"
+                f"*返却期限：* {loan.due_date.strftime('%Y年%m月%d日')} (*残り{days_remaining}日*)\n\n"
             )
+            
+            if can_extend and not has_reservations:
+                message += (
+                    f":clock1: *貸出期間の延長が可能です！*\n"
+                    f"<{extend_url}|こちらから延長手続き>ができます（1週間または2週間）\n\n"
+                )
+            elif has_reservations:
+                message += (
+                    f":warning: この本には{reservation_count}件の予約があるため、延長はできません。\n\n"
+                )
+            elif not can_extend:
+                message += (
+                    f":warning: この本は既に延長済みのため、再延長はできません。\n\n"
+                )
+            
+            message += f"期限内のご返却にご協力をお願いいたします。:pray:"
             
             # 貸出者にDMを送信
             success = send_slack_dm_to_user(loan.borrower, message)

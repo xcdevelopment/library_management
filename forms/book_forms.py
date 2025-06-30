@@ -1,7 +1,8 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired, FileAllowed
-from wtforms import StringField, BooleanField, SelectField
-from wtforms.validators import DataRequired, Length
+from wtforms import StringField, BooleanField, SelectField, DateField, RadioField
+from wtforms.validators import DataRequired, Length, Optional
+from datetime import datetime, timedelta
 
 class BookForm(FlaskForm):
     """書籍登録・編集フォーム"""
@@ -21,7 +22,7 @@ class BookForm(FlaskForm):
     keywords = StringField('キーワード', validators=[
         Length(max=200, message='キーワードは200文字以内で入力してください')
     ])
-    location = StringField('場所', validators=[
+    location = SelectField('場所', choices=[], validators=[
         Length(max=50, message='場所は50文字以内で入力してください')
     ])
     is_available = BooleanField('貸出可能')
@@ -42,4 +43,35 @@ class BookImportForm(FlaskForm):
     file = FileField('CSVファイル', validators=[
         FileRequired(message='ファイルを選択してください'),
         FileAllowed(['csv'], message='CSVファイルのみアップロード可能です')
-    ]) 
+    ])
+
+class BorrowForm(FlaskForm):
+    """本の貸出フォーム"""
+    due_date_option = RadioField(
+        '返却期限',
+        choices=[
+            ('today', '本日'),
+            ('1week', '1週間後'),
+            ('2weeks', '2週間後（デフォルト）'),
+            ('custom', 'カスタム')
+        ],
+        default='2weeks',
+        validators=[DataRequired()]
+    )
+    custom_due_date = DateField(
+        'カスタム返却期限',
+        validators=[Optional()],
+        default=lambda: datetime.now() + timedelta(weeks=2)
+    )
+
+class ExtendLoanForm(FlaskForm):
+    """貸出延長フォーム"""
+    extension_period = RadioField(
+        '延長期間',
+        choices=[
+            ('1', '1週間'),
+            ('2', '2週間')
+        ],
+        default='1',
+        validators=[DataRequired(message='延長期間を選択してください')]
+    ) 

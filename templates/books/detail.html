@@ -42,6 +42,10 @@
                     <div class="col-md-9">{{ book.location or '未設定' }}</div>
                 </div>
                 <div class="row mb-3">
+                    <div class="col-md-3"><strong>管理番号</strong></div>
+                    <div class="col-md-9">{{ book.book_number or '未設定' }}</div>
+                </div>
+                <div class="row mb-3">
                     <div class="col-md-3"><strong>貸出状況</strong></div>
                     <div class="col-md-9">
                         {% if book.is_available %}
@@ -92,26 +96,57 @@
         
         <!-- 貸出・返却ボタン -->
         <div class="mb-4">
-            {% if book.is_available %}
-                <form action="{{ url_for('books.borrow', book_id=book.id) }}" method="POST" class="d-inline">
-                    <button type="submit" class="btn btn-primary">
+            {% if book.status.value == '利用可能' %}
+                <!-- 貸出可能性チェック -->
+                {% set can_borrow = current_user.can_borrow_more() and not current_user.has_overdue_books() %}
+                {% if can_borrow %}
+                    <a href="{{ url_for('books.borrow', book_id=book.id) }}" class="btn btn-primary">
+                        <i class="fas fa-hand-holding"></i> 借りる
+                    </a>
+                {% else %}
+                    <button class="btn btn-primary" disabled title="貸出制限により借りることができません">
                         <i class="fas fa-hand-holding"></i> 借りる
                     </button>
-                </form>
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            {% if current_user.has_overdue_books() %}
+                                延滞中の本があるため借りることができません
+                            {% else %}
+                                貸出上限({{ current_user.max_loan_limit }}冊)に達しています
+                            {% endif %}
+                        </small>
+                    </div>
+                {% endif %}
             {% else %}
-                {% if book.borrower_id == current_user.id or is_admin %}
+                {% if book.borrower_id == current_user.id or current_user.is_admin %}
                     <form action="{{ url_for('books.return_book_route', book_id=book.id) }}" method="POST" class="d-inline">
                         <button type="submit" class="btn btn-success">
                             <i class="fas fa-undo"></i> 返却する
                         </button>
                     </form>
                 {% elif not user_reservation %}
-                    <!-- 予約フォーム -->
-                    <form action="{{ url_for('reservations.create', book_id=book.id) }}" method="POST" class="d-inline">
-                        <button type="submit" class="btn btn-warning">
+                    <!-- 予約可能性チェック -->
+                    {% set can_reserve = current_user.can_borrow_more() and not current_user.has_overdue_books() %}
+                    {% if can_reserve %}
+                        <form action="{{ url_for('reservations.create', book_id=book.id) }}" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-bookmark"></i> 予約する
+                            </button>
+                        </form>
+                    {% else %}
+                        <button class="btn btn-warning" disabled title="予約制限により予約できません">
                             <i class="fas fa-bookmark"></i> 予約する
                         </button>
-                    </form>
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                {% if current_user.has_overdue_books() %}
+                                    延滞中の本があるため予約できません
+                                {% else %}
+                                    貸出上限({{ current_user.max_loan_limit }}冊)に達しています
+                                {% endif %}
+                            </small>
+                        </div>
+                    {% endif %}
                 {% endif %}
             {% endif %}
             

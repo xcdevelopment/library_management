@@ -1,6 +1,6 @@
 # routes/api.py
 from flask import Blueprint, jsonify, request, current_app
-from models import db, LoanHistory, User
+from models import db, LoanHistory, User, CategoryLocationMapping
 from utils.decorators import api_key_required
 from datetime import datetime, timedelta
 
@@ -51,4 +51,20 @@ def get_category2_options(category1):
         category2_options = [{'value': option[0], 'text': option[1]} for option in CATEGORIES[category1]]
         return jsonify(category2_options)
     else:
+        return jsonify([])
+
+@api_bp.route('/locations/<category1>', methods=['GET'])
+def get_location_options(category1):
+    """第1分類に基づいて場所の選択肢を取得"""
+    try:
+        # 指定されたカテゴリに対応する全ての場所を取得
+        mappings = CategoryLocationMapping.query.filter_by(category1=category1).all()
+        
+        # 場所の選択肢を作成（重複を除去）
+        locations = list(set([mapping.default_location for mapping in mappings]))
+        location_options = [{'value': location, 'text': location} for location in sorted(locations)]
+        
+        return jsonify(location_options)
+    except Exception as e:
+        current_app.logger.error(f"Error fetching locations for category {category1}: {str(e)}")
         return jsonify([]) 

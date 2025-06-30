@@ -5,6 +5,38 @@
 {% block content %}
 <h2 class="mb-4">マイ書籍</h2>
 
+<!-- 貸出状況サマリー -->
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-chart-bar"></i> 貸出状況</h5>
+    </div>
+    <div class="card-body">
+        <div class="row text-center">
+            <div class="col-md-3">
+                <h4 class="text-primary">{{ current_user.current_loan_count() }}</h4>
+                <p class="mb-0">貸出中</p>
+            </div>
+            <div class="col-md-3">
+                <h4 class="text-info">{{ current_user.current_reservation_count() }}</h4>
+                <p class="mb-0">予約中</p>
+            </div>
+            <div class="col-md-3">
+                <h4 class="text-success">{{ current_user.max_loan_limit - current_user.current_loan_count() - current_user.current_reservation_count() }}</h4>
+                <p class="mb-0">利用可能</p>
+            </div>
+            <div class="col-md-3">
+                <h4 class="text-secondary">{{ current_user.max_loan_limit }}</h4>
+                <p class="mb-0">上限</p>
+            </div>
+        </div>
+        {% if current_user.has_overdue_books() %}
+            <div class="alert alert-danger mt-3">
+                <i class="fas fa-exclamation-triangle"></i> 延滞中の本があります。新しい本を借りるには、まず延滞本を返却してください。
+            </div>
+        {% endif %}
+    </div>
+</div>
+
 <!-- 貸出中の書籍 -->
 <div class="card mb-4">
     <div class="card-header bg-light">
@@ -20,28 +52,60 @@
                         <th>著者</th>
                         <th>貸出日</th>
                         <th>返却期限</th>
+                        <th>延長</th>
+                        <th>状態</th>
                         <th>操作</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for book in borrowed_books %}
-                    <tr>
+                    {% set loan = book.current_loan %}
+                    {% if loan %}
+                    <tr class="{% if loan.is_overdue() %}table-danger{% elif loan.days_until_due() and loan.days_until_due() <= 3 %}table-warning{% endif %}">
                         <td>
                             <a href="{{ url_for('books.book_detail', book_id=book.id) }}">
                                 {{ book.title }}
                             </a>
                         </td>
-                        <td>{{ book.author }}</td>
-                        <td>{{ book.current_loan.loan_date.strftime('%Y/%m/%d') }}</td>
-                        <td>{{ book.current_loan.due_date.strftime('%Y/%m/%d') }}</td>
+                        <td>{{ book.author or '-' }}</td>
+                        <td>{{ loan.loan_date.strftime('%Y/%m/%d') }}</td>
                         <td>
-                            <form method="POST" action="{{ url_for('books.return_book_route', book_id=book.id) }}" class="d-inline">
-                                <button type="submit" class="btn btn-sm btn-outline-success">
-                                    <i class="fas fa-undo"></i> 返却
-                                </button>
-                            </form>
+                            {{ loan.due_date.strftime('%Y/%m/%d') }}
+                            {% if loan.is_overdue() %}
+                                <br><small class="text-danger">延滞中</small>
+                            {% elif loan.days_until_due() and loan.days_until_due() <= 3 %}
+                                <br><small class="text-warning">期限間近</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">{{ loan.extension_count }}/1回</span>
+                            {% if loan.extended_date %}
+                                <br><small class="text-muted">{{ loan.extended_date.strftime('%m/%d') }}延長</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if loan.can_extend() %}
+                                <span class="badge bg-success">延長可能</span>
+                            {% else %}
+                                <span class="badge bg-secondary">延長不可</span>
+                            {% endif %}
+                        </td>
+                        <td style="min-width: 100px;">
+                            <div class="d-flex flex-column gap-1">
+                                {% if loan.can_extend() %}
+                                    <a href="{{ url_for('books.extend_loan', loan_id=loan.id) }}" class="btn btn-sm btn-outline-primary text-nowrap">
+                                        <i class="fas fa-clock me-1"></i>延長
+                                    </a>
+                                {% endif %}
+                                <form method="POST" action="{{ url_for('books.return_book_route', book_id=book.id) }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-success w-100 text-nowrap">
+                                        <i class="fas fa-undo me-1"></i>返却
+                                    </button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
+                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>

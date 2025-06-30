@@ -29,6 +29,12 @@
                             {{ form.password(class="form-control", placeholder="変更する場合のみ入力") }}
                         </div>
 
+                        <div class="mb-3">
+                            {{ form.max_loan_limit.label(class="form-label") }}
+                            {{ form.max_loan_limit(class="form-control") }}
+                            <div class="form-text">ユーザーが同時に借りられる本の最大数（貸出中+予約中の合計）</div>
+                        </div>
+
                         <div class="form-check mb-3">
                             {{ form.is_admin(class="form-check-input") }}
                             {{ form.is_admin.label(class="form-check-label") }}

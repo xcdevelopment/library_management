@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}新規カテゴリ-場所設定{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <i class="fas fa-plus"></i> 新規カテゴリ-場所設定
+        </h1>
+        <a href="{{ url_for('admin.category_locations') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> 戻る
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="mb-3">
+                            {{ form.category1.label(class="form-label") }}
+                            {{ form.category1(class="form-control" + (" is-invalid" if form.category1.errors else "")) }}
+                            {% if form.category1.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.category1.errors %}{{ error }}{% endfor %}
+                            </div>
+                            {% endif %}
+                            <div class="form-text">例: プログラミング、データベース、ビジネス等</div>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.default_location.label(class="form-label") }}
+                            {{ form.default_location(class="form-control" + (" is-invalid" if form.default_location.errors else "")) }}
+                            {% if form.default_location.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.default_location.errors %}{{ error }}{% endfor %}
+                            </div>
+                            {% endif %}
+                            <div class="form-text">例: A棚-1、B棚-2、C棚-3等</div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('admin.category_locations') }}" class="btn btn-secondary me-md-2">キャンセル</a>
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">設定について</h6>
+                </div>
+                <div class="card-body">
+                    <p><strong>機能:</strong></p>
+                    <ul>
+                        <li>新しい書籍登録時に場所が自動入力されます</li>
+                        <li>第１分類に基づいて適切な場所が選択されます</li>
+                        <li>手動で場所を指定した場合は、この設定は無視されます</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}本を借りる - {{ book.title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-book"></i> 本を借りる</h3>
+                </div>
+                <div class="card-body">
+                    <div class="book-info mb-4">
+                        <h4>{{ book.title }}</h4>
+                        {% if book.author %}
+                            <p class="text-muted"><i class="fas fa-user"></i> {{ book.author }}</p>
+                        {% endif %}
+                        {% if book.category1 %}
+                            <p class="text-muted"><i class="fas fa-tag"></i> {{ book.category1 }}
+                                {% if book.category2 %} > {{ book.category2 }}{% endif %}
+                            </p>
+                        {% endif %}
+                        {% if book.location %}
+                            <p class="text-muted"><i class="fas fa-map-marker-alt"></i> {{ book.location }}</p>
+                        {% endif %}
+                    </div>
+
+                    {% if not can_borrow %}
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle"></i> {{ error_msg }}
+                        </div>
+                        <a href="{{ url_for('books.book_detail', book_id=book.id) }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> 戻る
+                        </a>
+                    {% else %}
+                        <form method="POST">
+                            {{ form.hidden_tag() }}
+                            
+                            <div class="form-group mb-3">
+                                <label class="form-label">{{ form.due_date_option.label.text }}</label>
+                                <div class="form-check-container">
+                                    {% for subfield in form.due_date_option %}
+                                        <div class="form-check">
+                                            {{ subfield(class="form-check-input") }}
+                                            {{ subfield.label(class="form-check-label") }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                {% if form.due_date_option.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.due_date_option.errors %}
+                                            <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="form-group mb-3" id="custom-date-group" style="display: none;">
+                                {{ form.custom_due_date.label(class="form-label") }}
+                                {{ form.custom_due_date(class="form-control") }}
+                                {% if form.custom_due_date.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.custom_due_date.errors %}
+                                            <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> 
+                                <strong>貸出ルール:</strong>
+                                <ul class="mb-0 mt-2">
+                                    <li>最大{{ current_user.max_loan_limit }}冊まで同時に借りることができます</li>
+                                    <li>延長は1回まで可能です（予約者がいない場合）</li>
+                                    <li>返却期限を守ってください</li>
+                                    <li>返却の際は、本を元の場所に戻してください</li>
+                                </ul>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                <a href="{{ url_for('books.book_detail', book_id=book.id) }}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left"></i> キャンセル
+                                </a>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-check"></i> 借りる
+                                </button>
+                            </div>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dueDateOptions = document.querySelectorAll('input[name="due_date_option"]');
+    const customDateGroup = document.getElementById('custom-date-group');
+    
+    function toggleCustomDate() {
+        const customSelected = document.querySelector('input[name="due_date_option"]:checked')?.value === 'custom';
+        customDateGroup.style.display = customSelected ? 'block' : 'none';
+    }
+    
+    dueDateOptions.forEach(radio => {
+        radio.addEventListener('change', toggleCustomDate);
+    });
+    
+    // 初期状態をチェック
+    toggleCustomDate();
+});
+</script>
+{% endblock %}

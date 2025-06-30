@@ -6,8 +6,7 @@ services:
       - "80:5000"
     volumes:
       - .:/app
-    entrypoint: ["/app/entrypoint.sh"]
-    command: ["gunicorn", "--workers", "4", "--bind", "0.0.0.0:5000", "app:create_app()"]
+    command: ["flask", "run", "--host=0.0.0.0"]
     env_file:
       - .env
     depends_on:

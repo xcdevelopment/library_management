@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, EmailField, PasswordField, BooleanField, SubmitField
-from wtforms.validators import DataRequired, Email, Length, EqualTo
+from wtforms import StringField, EmailField, PasswordField, BooleanField, SubmitField, IntegerField
+from wtforms.validators import DataRequired, Email, Length, EqualTo, NumberRange
 
 class EditProfileForm(FlaskForm):
     """プロフィール編集フォーム"""
@@ -37,4 +37,8 @@ class UserForm(FlaskForm):
         Length(max=120, message='メールアドレスは120文字以内で入力してください')
     ])
     is_admin = BooleanField('管理者権限')
+    max_loan_limit = IntegerField('最大貸出数', validators=[
+        DataRequired(message='最大貸出数を入力してください'),
+        NumberRange(min=1, max=10, message='最大貸出数は1冊以上10冊以下で設定してください')
+    ], default=3)
     submit = SubmitField('保存') 

@@ -69,7 +69,14 @@
 
             <div class="mb-3">
                 {{ form.location.label(class="form-label") }}
-                {{ form.location(class="form-control") }}
+                {{ form.location(class="form-select", id="location") }}
+                {% if form.location.errors %}
+                <div class="invalid-feedback d-block">
+                    {% for error in form.location.errors %}
+                    <span>{{ error }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
             </div>
 
             <div class="d-grid gap-2 d-md-flex justify-content-md-end">
@@ -91,9 +98,50 @@
 document.addEventListener('DOMContentLoaded', function() {
     const category1Select = document.getElementById('category1');
     const category2Select = document.getElementById('category2');
+    const locationSelect = document.getElementById('location');
     
-    if (!category1Select || !category2Select) {
+    if (!category1Select || !category2Select || !locationSelect) {
         return; // 要素が存在しない場合は何もしない
+    }
+    
+    // 場所選択肢を更新する関数
+    function updateLocationOptions(selectedCategory1) {
+        // 場所をリセット
+        locationSelect.innerHTML = '<option value="">選択してください</option>';
+        
+        if (selectedCategory1 === '') {
+            locationSelect.disabled = true;
+            return;
+        }
+        
+        // 場所を有効化
+        locationSelect.disabled = false;
+        
+        // APIから場所の選択肢を取得
+        fetch(`/api/locations/${encodeURIComponent(selectedCategory1)}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                // 取得した選択肢を場所に追加
+                data.forEach(option => {
+                    const optionElement = document.createElement('option');
+                    optionElement.value = option.value;
+                    optionElement.textContent = option.text;
+                    locationSelect.appendChild(optionElement);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching location options:', error);
+                // エラーの場合はデフォルトメッセージを表示
+                const errorOption = document.createElement('option');
+                errorOption.value = '';
+                errorOption.textContent = '選択肢の読み込みに失敗しました';
+                locationSelect.appendChild(errorOption);
+            });
     }
     
     // 第1分類が変更されたときの処理
@@ -106,11 +154,15 @@ document.addEventListener('DOMContentLoaded', function() {
         if (selectedCategory1 === '') {
             // 第1分類が未選択の場合は第2分類も無効化
             category2Select.disabled = true;
+            updateLocationOptions('');
             return;
         }
         
         // 第2分類を有効化
         category2Select.disabled = false;
+        
+        // 場所の選択肢を更新
+        updateLocationOptions(selectedCategory1);
         
         // APIから第2分類の選択肢を取得
         fetch(`/api/categories/${encodeURIComponent(selectedCategory1)}`)
@@ -143,8 +195,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (category1Select.value !== '') {
         category1Select.dispatchEvent(new Event('change'));
     } else {
-        // 第1分類が未選択の場合は第2分類を無効化
+        // 第1分類が未選択の場合は第2分類と場所を無効化
         category2Select.disabled = true;
+        locationSelect.disabled = true;
     }
 });
 </script>

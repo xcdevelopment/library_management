@@ -31,6 +31,7 @@ from routes.users import users_bp
 from routes.admin import admin_bp
 from routes.reservations import reservations_bp
 from routes.api import api_bp
+from routes.home import home_bp
 from utils.logger import setup_logger
 from config import config
 
@@ -262,6 +263,7 @@ def create_app(config_name=None):
         app.logger.info('Library startup')
     
     # Blueprintの登録
+    app.register_blueprint(home_bp)  # ルートパスで登録
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(books_bp, url_prefix='/books')
     app.register_blueprint(users_bp, url_prefix='/users')
@@ -280,9 +282,6 @@ def create_app(config_name=None):
         default_limits=["200 per day", "50 per hour"]
     )
     
-    @app.route('/')
-    def index():
-        return redirect(url_for('books.index'))
     
     @app.errorhandler(404)
     def page_not_found(e):
