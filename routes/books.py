@@ -542,15 +542,26 @@ def edit_book(book_id):
     # category1の値を取得（POSTならフォームから、GETならDBから）
     category1_val = form.category1.data if request.method == 'POST' else book.category1
 
-    # 第1分類に基づいて第2分類と場所の選択肢をDBから取得して設定
-    if category1_val:
-        mappings = CategoryLocationMapping.query.filter_by(category1=category1_val).all()
-        cat2_choices = sorted(list(set(m.category2 for m in mappings if m.category2)))
-        loc_choices = sorted(list(set(m.default_location for m in mappings if m.default_location)))
-        form.category2.choices = [('', '選択してください')] + [(c, c) for c in cat2_choices]
-        form.location.choices = [('', '選択してください')] + [(l, l) for l in loc_choices]
+    # 第2分類の選択肢をハードコードされたCATEGORIESから設定
+    if category1_val and category1_val in CATEGORIES:
+        form.category2.choices = [('', '選択してください')] + CATEGORIES[category1_val]
     else:
         form.category2.choices = [('', '選択してください')]
+    
+    # 配置場所の選択肢をDBから設定
+    try:
+        if category1_val:
+            mappings = CategoryLocationMapping.query.filter_by(category1=category1_val).all()
+            loc_choices = sorted(list(set(m.default_location for m in mappings if m.default_location)))
+            form.location.choices = [('', '選択してください')] + [(l, l) for l in loc_choices]
+        else:
+            # 全ての利用可能な場所を取得
+            locations = CategoryLocationMapping.query.with_entities(
+                CategoryLocationMapping.default_location
+            ).distinct().all()
+            form.location.choices = [('', '選択してください')] + [(loc.default_location, loc.default_location) for loc in locations]
+    except Exception:
+        # データベースエラーの場合はデフォルト
         form.location.choices = [('', '選択してください')]
     # --- 選択肢の設定ここまで ---
 
