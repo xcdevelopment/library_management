@@ -536,17 +536,25 @@ def edit_book(book_id):
         return redirect(url_for('books.index'))
 
     book = Book.query.get_or_404(book_id)
-    form = BookForm(obj=book)
+    form = BookForm()
     
     # 既存データに基づいて選択肢を設定
     form.populate_location_choices()
     if book.category1:
-        form.populate_category2_choices(book.category1, preserve_current=True)
+        form.populate_category2_choices(book.category1)
+    
+    # フォームに既存データを設定（選択肢設定後）
+    form.title.data = book.title
+    form.author.data = book.author
+    form.category1.data = book.category1
+    form.category2.data = book.category2
+    form.keywords.data = book.keywords
+    form.location.data = book.location
     
     # POSTリクエストでフォーム送信時に選択肢を再設定
     if request.method == 'POST':
         if form.category1.data:
-            form.populate_category2_choices(form.category1.data, preserve_current=True)
+            form.populate_category2_choices(form.category1.data)
 
     if form.validate_on_submit():
         form.populate_obj(book)
