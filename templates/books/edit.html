@@ -200,11 +200,14 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     });
     
-    // ページ読み込み時に第1分類が既に選択されている場合の処理
-    if (category1Select.value !== '') {
+    // ページ読み込み時の処理 - 編集画面では自動実行しない
+    // 新規作成画面でのみ動作するように制限
+    const isEditPage = document.querySelector('form').action.includes('/edit/');
+    
+    if (!isEditPage && category1Select.value !== '') {
         category1Select.dispatchEvent(new Event('change'));
-    } else {
-        // 第1分類が未選択の場合は第2分類と場所を無効化
+    } else if (!isEditPage) {
+        // 第1分類が未選択の場合は第2分類と場所を無効化（新規作成時のみ）
         category2Select.disabled = true;
         locationSelect.disabled = true;
     }
