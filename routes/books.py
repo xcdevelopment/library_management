@@ -550,8 +550,7 @@ def edit_book(book_id):
         log = OperationLog(
             user_id=current_user.id,
             action='edit_book',
-            target=f'Book {book.id}',
-            details=f"Title: {book.title}",
+            target=f'Book {book.id}: {book.title}',
             ip_address=request.remote_addr
         )
         db.session.add(log)
