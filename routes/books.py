@@ -538,40 +538,46 @@ def edit_book(book_id):
     book = Book.query.get_or_404(book_id)
     form = BookForm()
     
-    # 既存データに基づいて選択肢を設定
-    form.populate_location_choices()
-    if book.category1:
-        form.populate_category2_choices(book.category1)
-    
-    # フォームに既存データを設定（選択肢設定後）
-    form.title.data = book.title
-    form.author.data = book.author
-    form.category1.data = book.category1
-    form.category2.data = book.category2
-    form.keywords.data = book.keywords
-    form.location.data = book.location
-    
-    # POSTリクエストでフォーム送信時に選択肢を再設定
-    if request.method == 'POST':
+    if request.method == 'GET':
+        # GETリクエスト: 編集画面の表示
+        # 1. 既存の第1分類に基づいて選択肢を設定
+        form.populate_location_choices()
+        if book.category1:
+            form.populate_category2_choices(book.category1)
+            form.populate_location_choices_for_category(book.category1)
+        
+        # 2. 選択肢設定後に既存データを設定
+        form.title.data = book.title
+        form.author.data = book.author
+        form.category1.data = book.category1
+        form.category2.data = book.category2
+        form.keywords.data = book.keywords
+        form.location.data = book.location
+        
+    elif request.method == 'POST':
+        # POSTリクエスト: 更新処理
+        # 1. 送信された第1分類に基づいて選択肢を設定
+        form.populate_location_choices()
         if form.category1.data:
             form.populate_category2_choices(form.category1.data)
             form.populate_location_choices_for_category(form.category1.data)
-
-    if form.validate_on_submit():
-        form.populate_obj(book)
-        db.session.commit()
         
-        log = OperationLog(
-            user_id=current_user.id,
-            action='edit_book',
-            target=f'Book {book.id}: {book.title}',
-            ip_address=request.remote_addr
-        )
-        db.session.add(log)
-        db.session.commit()
-        
-        flash('書籍情報が更新されました。', 'success')
-        return redirect(url_for('books.book_detail', book_id=book.id))
+        # 2. バリデーション実行
+        if form.validate_on_submit():
+            form.populate_obj(book)
+            db.session.commit()
+            
+            log = OperationLog(
+                user_id=current_user.id,
+                action='edit_book',
+                target=f'Book {book.id}: {book.title}',
+                ip_address=request.remote_addr
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            flash('書籍情報が更新されました。', 'success')
+            return redirect(url_for('books.book_detail', book_id=book.id))
 
     return render_template('books/edit.html', form=form, book=book)
 
