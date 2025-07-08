@@ -563,9 +563,6 @@ def edit_book(book_id):
         form.keywords.data = book.keywords
         form.location.data = book.location
         
-        # デバッグ用 - フラッシュメッセージで確認
-        flash(f'デバッグ: 書籍ID={book.id}, category1={book.category1}, category2={book.category2}, location={book.location}', 'info')
-        flash(f'デバッグ: フォーム設定後 category2={form.category2.data}, location={form.location.data}', 'info')
         
     elif request.method == 'POST':
         # POSTリクエスト: 更新処理
