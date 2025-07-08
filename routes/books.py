@@ -542,6 +542,11 @@ def edit_book(book_id):
     form.populate_location_choices()
     if book.category1:
         form.populate_category2_choices(book.category1)
+    
+    # POSTリクエストでフォーム送信時に選択肢を再設定
+    if request.method == 'POST':
+        if form.category1.data:
+            form.populate_category2_choices(form.category1.data)
 
     if form.validate_on_submit():
         form.populate_obj(book)
