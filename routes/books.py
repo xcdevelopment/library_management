@@ -555,6 +555,7 @@ def edit_book(book_id):
     if request.method == 'POST':
         if form.category1.data:
             form.populate_category2_choices(form.category1.data)
+            form.populate_location_choices_for_category(form.category1.data)
 
     if form.validate_on_submit():
         form.populate_obj(book)
@@ -573,6 +574,49 @@ def edit_book(book_id):
         return redirect(url_for('books.book_detail', book_id=book.id))
 
     return render_template('books/edit.html', form=form, book=book)
+
+@books_bp.route('/delete/<int:book_id>', methods=['POST'])
+@login_required
+def delete_book(book_id):
+    """書籍を削除する (管理者のみ)"""
+    if not current_user.is_admin:
+        flash('この操作は管理者のみ許可されています。', 'danger')
+        return redirect(url_for('books.index'))
+
+    book = Book.query.get_or_404(book_id)
+    
+    # 現在貸出中または予約されている場合は削除を拒否
+    if book.borrower_id:
+        flash('この書籍は現在貸出中のため削除できません。', 'danger')
+        return redirect(url_for('books.book_detail', book_id=book_id))
+    
+    if book.reservations:
+        active_reservations = [r for r in book.reservations if r.status == ReservationStatus.PENDING]
+        if active_reservations:
+            flash('この書籍には予約者がいるため削除できません。', 'danger')
+            return redirect(url_for('books.book_detail', book_id=book_id))
+    
+    book_title = book.title
+    
+    # 関連データの削除
+    # 貸出履歴は保持（データの整合性のため）
+    # 予約データは既にチェック済み
+    
+    db.session.delete(book)
+    db.session.commit()
+    
+    # 操作ログの記録
+    log = OperationLog(
+        user_id=current_user.id,
+        action='delete_book',
+        target=f'Book {book_id}: {book_title}',
+        ip_address=request.remote_addr
+    )
+    db.session.add(log)
+    db.session.commit()
+    
+    flash(f'書籍「{book_title}」を削除しました。', 'success')
+    return redirect(url_for('books.index'))
 
 @books_bp.route('/loan/extend/<int:loan_id>', methods=['GET', 'POST'])
 @login_required

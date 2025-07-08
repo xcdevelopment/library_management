@@ -82,6 +82,17 @@ class BookForm(FlaskForm):
         location_choices.extend([(loc.default_location, loc.default_location) for loc in locations])
         self.location.choices = location_choices
     
+    def populate_location_choices_for_category(self, category1):
+        """指定されたカテゴリに基づいて場所の選択肢を設定"""
+        if category1:
+            mappings = CategoryLocationMapping.query.filter_by(category1=category1).all()
+            locations = list(set([mapping.default_location for mapping in mappings]))
+            location_choices = [('', '選択してください')]
+            location_choices.extend([(loc, loc) for loc in sorted(locations)])
+            self.location.choices = location_choices
+        else:
+            self.location.choices = [('', '選択してください')]
+    
     def populate_category2_choices(self, category1, preserve_current=False):
         """第1分類に基づいて第2分類の選択肢を設定"""
         current_value = self.category2.data if preserve_current else None
