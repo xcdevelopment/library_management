@@ -119,6 +119,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 return response.json();
             })
             .then(data => {
+                // 既存の選択値を保存
+                const currentValue = locationSelect.value;
+                
                 // 取得した選択肢を場所に追加
                 data.forEach(option => {
                     const optionElement = document.createElement('option');
@@ -126,6 +129,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     optionElement.textContent = option.text;
                     locationSelect.appendChild(optionElement);
                 });
+                
+                // 既存の値を復元
+                if (currentValue) {
+                    locationSelect.value = currentValue;
+                }
             })
             .catch(error => {
                 console.error('Error fetching location options:', error);
@@ -166,6 +174,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 return response.json();
             })
             .then(data => {
+                // 既存の選択値を保存
+                const currentValue = category2Select.value;
+                
                 // 取得した選択肢を第2分類に追加
                 data.forEach(option => {
                     const optionElement = document.createElement('option');
@@ -173,6 +184,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     optionElement.textContent = option.text;
                     category2Select.appendChild(optionElement);
                 });
+                
+                // 既存の値を復元
+                if (currentValue) {
+                    category2Select.value = currentValue;
+                }
             })
             .catch(error => {
                 console.error('Error fetching category2 options:', error);
