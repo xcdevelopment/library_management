@@ -536,55 +536,33 @@ def edit_book(book_id):
         return redirect(url_for('books.index'))
 
     book = Book.query.get_or_404(book_id)
-    form = BookForm(request.form if request.method == 'POST' else None, obj=book)
-
-    # --- 選択肢の動的設定 ---
-    # category1の値を取得（POSTならフォームから、GETならDBから）
-    category1_val = form.category1.data if request.method == 'POST' else book.category1
-
-    # 第2分類の選択肢をハードコードされたCATEGORIESから設定
-    if category1_val and category1_val in CATEGORIES:
-        form.category2.choices = [('', '選択してください')] + CATEGORIES[category1_val]
-    else:
-        form.category2.choices = [('', '選択してください')]
+    form = BookForm()
     
-    # 配置場所の選択肢をDBから設定
-    try:
-        if category1_val:
-            mappings = CategoryLocationMapping.query.filter_by(category1=category1_val).all()
-            loc_choices = sorted(list(set(m.default_location for m in mappings if m.default_location)))
-            form.location.choices = [('', '選択してください')] + [(l, l) for l in loc_choices]
+    if request.method == 'GET':
+        # GETリクエスト: 編集画面の表示
+        # 1. 既存の第1分類に基づいて選択肢を設定
+        if book.category1 and book.category1 in CATEGORIES:
+            form.category2.choices = [('', '選択してください')] + CATEGORIES[book.category1]
         else:
-            # 全ての利用可能な場所を取得
+            form.category2.choices = [('', '選択してください')]
+        
+        # 配置場所の選択肢を設定
+        try:
             locations = CategoryLocationMapping.query.with_entities(
                 CategoryLocationMapping.default_location
             ).distinct().all()
             form.location.choices = [('', '選択してください')] + [(loc.default_location, loc.default_location) for loc in locations]
-    except Exception:
-        # データベースエラーの場合はデフォルト
-        form.location.choices = [('', '選択してください')]
-    # --- 選択肢の設定ここまで ---
-
-    if form.validate_on_submit():
-        # populate_objでフォームのデータをモデルに一括設定
-        form.populate_obj(book)
-        db.session.commit()
-
-        log = OperationLog(
-            user_id=current_user.id,
-            action='edit_book',
-            target=f'Book {book.id}: {book.title}',
-            ip_address=request.remote_addr
-        )
-        db.session.add(log)
-        db.session.commit()
-
-        flash('書籍情報が更新されました。', 'success')
-        return redirect(url_for('books.book_detail', book_id=book.id))
-
-    # GETリクエストの場合、DBの値をフォームに正しく反映させる
-    # obj=bookで大半は設定されるが、動的選択肢のフィールドは再設定が必要
-    if request.method == 'GET':
+        except Exception:
+            form.location.choices = [('', '選択してください')]
+        
+        # 2. 選択肢設定後に既存データを設定
+        form.title.data = book.title
+        form.author.data = book.author
+        form.category1.data = book.category1
+        form.category2.data = book.category2
+        form.keywords.data = book.keywords
+        form.location.data = book.location
+        
         print(f"=== DEBUG INFO ===")
         print(f"Book ID: {book.id}")
         print(f"Book category1: {book.category1}")
@@ -592,13 +570,42 @@ def edit_book(book_id):
         print(f"Book location: {book.location}")
         print(f"Form category2 choices: {form.category2.choices}")
         print(f"Form location choices: {form.location.choices}")
-        
-        form.category2.data = book.category2
-        form.location.data = book.location
-        
         print(f"After setting - Form category2.data: {form.category2.data}")
         print(f"After setting - Form location.data: {form.location.data}")
         print(f"==================")
+        
+    elif request.method == 'POST':
+        # POSTリクエスト: 更新処理
+        # 1. 送信された第1分類に基づいて選択肢を設定
+        if form.category1.data and form.category1.data in CATEGORIES:
+            form.category2.choices = [('', '選択してください')] + CATEGORIES[form.category1.data]
+        else:
+            form.category2.choices = [('', '選択してください')]
+        
+        try:
+            locations = CategoryLocationMapping.query.with_entities(
+                CategoryLocationMapping.default_location
+            ).distinct().all()
+            form.location.choices = [('', '選択してください')] + [(loc.default_location, loc.default_location) for loc in locations]
+        except Exception:
+            form.location.choices = [('', '選択してください')]
+        
+        # 2. バリデーション実行
+        if form.validate_on_submit():
+            form.populate_obj(book)
+            db.session.commit()
+            
+            log = OperationLog(
+                user_id=current_user.id,
+                action='edit_book',
+                target=f'Book {book.id}: {book.title}',
+                ip_address=request.remote_addr
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            flash('書籍情報が更新されました。', 'success')
+            return redirect(url_for('books.book_detail', book_id=book.id))
 
     return render_template('books/edit.html', form=form, book=book, categories=CATEGORIES)
 
