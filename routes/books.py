@@ -563,16 +563,9 @@ def edit_book(book_id):
         form.keywords.data = book.keywords
         form.location.data = book.location
         
-        print(f"=== DEBUG INFO ===")
-        print(f"Book ID: {book.id}")
-        print(f"Book category1: {book.category1}")
-        print(f"Book category2: {book.category2}")
-        print(f"Book location: {book.location}")
-        print(f"Form category2 choices: {form.category2.choices}")
-        print(f"Form location choices: {form.location.choices}")
-        print(f"After setting - Form category2.data: {form.category2.data}")
-        print(f"After setting - Form location.data: {form.location.data}")
-        print(f"==================")
+        # デバッグ用 - フラッシュメッセージで確認
+        flash(f'デバッグ: 書籍ID={book.id}, category1={book.category1}, category2={book.category2}, location={book.location}', 'info')
+        flash(f'デバッグ: フォーム設定後 category2={form.category2.data}, location={form.location.data}', 'info')
         
     elif request.method == 'POST':
         # POSTリクエスト: 更新処理
