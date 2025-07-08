@@ -585,8 +585,20 @@ def edit_book(book_id):
     # GETリクエストの場合、DBの値をフォームに正しく反映させる
     # obj=bookで大半は設定されるが、動的選択肢のフィールドは再設定が必要
     if request.method == 'GET':
+        print(f"=== DEBUG INFO ===")
+        print(f"Book ID: {book.id}")
+        print(f"Book category1: {book.category1}")
+        print(f"Book category2: {book.category2}")
+        print(f"Book location: {book.location}")
+        print(f"Form category2 choices: {form.category2.choices}")
+        print(f"Form location choices: {form.location.choices}")
+        
         form.category2.data = book.category2
         form.location.data = book.location
+        
+        print(f"After setting - Form category2.data: {form.category2.data}")
+        print(f"After setting - Form location.data: {form.location.data}")
+        print(f"==================")
 
     return render_template('books/edit.html', form=form, book=book, categories=CATEGORIES)
 
