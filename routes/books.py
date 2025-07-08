@@ -312,6 +312,12 @@ def add():
     
     form = BookForm()
     form.populate_location_choices()  # 場所の選択肢を設定
+    
+    # POSTリクエストでフォーム送信時に選択肢を再設定
+    if request.method == 'POST':
+        if form.category1.data:
+            form.populate_category2_choices(form.category1.data)
+    
     if form.validate_on_submit():
         # 自動管理番号とカテゴリベース自動ロケーション機能を使用
         book = create_book_with_auto_number(
@@ -531,6 +537,11 @@ def edit_book(book_id):
 
     book = Book.query.get_or_404(book_id)
     form = BookForm(obj=book)
+    
+    # 既存データに基づいて選択肢を設定
+    form.populate_location_choices()
+    if book.category1:
+        form.populate_category2_choices(book.category1)
 
     if form.validate_on_submit():
         form.populate_obj(book)
