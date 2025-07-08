@@ -70,38 +70,4 @@ class BookForm(FlaskForm):
     ], validators=[DataRequired()])
     category2 = SelectField('第２分類', choices=[('', '選択してください')])
     keywords = StringField('キーワード')
-    location = SelectField('配置場所', choices=[])
-    
-    def populate_location_choices(self):
-        """全ての利用可能な場所選択肢を設定"""
-        locations = CategoryLocationMapping.query.with_entities(
-            CategoryLocationMapping.default_location
-        ).distinct().all()
-        
-        location_choices = [('', '選択してください')]
-        location_choices.extend([(loc.default_location, loc.default_location) for loc in locations])
-        self.location.choices = location_choices
-    
-    def populate_location_choices_for_category(self, category1):
-        """指定されたカテゴリに基づいて場所の選択肢を設定"""
-        if category1:
-            mappings = CategoryLocationMapping.query.filter_by(category1=category1).all()
-            locations = list(set([mapping.default_location for mapping in mappings]))
-            location_choices = [('', '選択してください')]
-            location_choices.extend([(loc, loc) for loc in sorted(locations)])
-            self.location.choices = location_choices
-        else:
-            self.location.choices = [('', '選択してください')]
-    
-    def populate_category2_choices(self, category1, preserve_current=False):
-        """第1分類に基づいて第2分類の選択肢を設定"""
-        current_value = self.category2.data if preserve_current else None
-        
-        if category1 and category1 in CATEGORIES:
-            self.category2.choices = [('', '選択してください')] + CATEGORIES[category1]
-        else:
-            self.category2.choices = [('', '選択してください')]
-        
-        # 既存の値を保持
-        if preserve_current and current_value:
-            self.category2.data = current_value 
+    location = SelectField('配置場所', choices=[]) 

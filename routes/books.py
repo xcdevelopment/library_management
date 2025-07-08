@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import chardet
 import requests
 
-from models import Book, LoanHistory, Reservation, OperationLog, db, User, ReservationStatus, BookStatus
+from models import Book, LoanHistory, Reservation, OperationLog, db, User, ReservationStatus, BookStatus, CategoryLocationMapping
 from services.book_service import borrow_book, return_book, reserve_book, cancel_reservation, create_book_with_auto_number, update_book_status
 from services.loan_service import LoanService
 from services.slack_service import send_slack_dm_to_user
@@ -536,50 +536,48 @@ def edit_book(book_id):
         return redirect(url_for('books.index'))
 
     book = Book.query.get_or_404(book_id)
-    form = BookForm()
-    
-    if request.method == 'GET':
-        # GETリクエスト: 編集画面の表示
-        # 1. 既存の第1分類に基づいて選択肢を設定
-        form.populate_location_choices()
-        if book.category1:
-            form.populate_category2_choices(book.category1)
-            form.populate_location_choices_for_category(book.category1)
-        
-        # 2. 選択肢設定後に既存データを設定
-        form.title.data = book.title
-        form.author.data = book.author
-        form.category1.data = book.category1
-        form.category2.data = book.category2
-        form.keywords.data = book.keywords
-        form.location.data = book.location
-        
-    elif request.method == 'POST':
-        # POSTリクエスト: 更新処理
-        # 1. 送信された第1分類に基づいて選択肢を設定
-        form.populate_location_choices()
-        if form.category1.data:
-            form.populate_category2_choices(form.category1.data)
-            form.populate_location_choices_for_category(form.category1.data)
-        
-        # 2. バリデーション実行
-        if form.validate_on_submit():
-            form.populate_obj(book)
-            db.session.commit()
-            
-            log = OperationLog(
-                user_id=current_user.id,
-                action='edit_book',
-                target=f'Book {book.id}: {book.title}',
-                ip_address=request.remote_addr
-            )
-            db.session.add(log)
-            db.session.commit()
-            
-            flash('書籍情報が更新されました。', 'success')
-            return redirect(url_for('books.book_detail', book_id=book.id))
+    form = BookForm(request.form if request.method == 'POST' else None, obj=book)
 
-    return render_template('books/edit.html', form=form, book=book)
+    # --- 選択肢の動的設定 ---
+    # category1の値を取得（POSTならフォームから、GETならDBから）
+    category1_val = form.category1.data if request.method == 'POST' else book.category1
+
+    # 第1分類に基づいて第2分類と場所の選択肢をDBから取得して設定
+    if category1_val:
+        mappings = CategoryLocationMapping.query.filter_by(category1=category1_val).all()
+        cat2_choices = sorted(list(set(m.category2 for m in mappings if m.category2)))
+        loc_choices = sorted(list(set(m.default_location for m in mappings if m.default_location)))
+        form.category2.choices = [('', '選択してください')] + [(c, c) for c in cat2_choices]
+        form.location.choices = [('', '選択してください')] + [(l, l) for l in loc_choices]
+    else:
+        form.category2.choices = [('', '選択してください')]
+        form.location.choices = [('', '選択してください')]
+    # --- 選択肢の設定ここまで ---
+
+    if form.validate_on_submit():
+        # populate_objでフォームのデータをモデルに一括設定
+        form.populate_obj(book)
+        db.session.commit()
+
+        log = OperationLog(
+            user_id=current_user.id,
+            action='edit_book',
+            target=f'Book {book.id}: {book.title}',
+            ip_address=request.remote_addr
+        )
+        db.session.add(log)
+        db.session.commit()
+
+        flash('書籍情報が更新されました。', 'success')
+        return redirect(url_for('books.book_detail', book_id=book.id))
+
+    # GETリクエストの場合、DBの値をフォームに正しく反映させる
+    # obj=bookで大半は設定されるが、動的選択肢のフィールドは再設定が必要
+    if request.method == 'GET':
+        form.category2.data = book.category2
+        form.location.data = book.location
+
+    return render_template('books/edit.html', form=form, book=book, categories=CATEGORIES)
 
 @books_bp.route('/delete/<int:book_id>', methods=['POST'])
 @login_required
