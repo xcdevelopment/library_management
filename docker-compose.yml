@@ -1,43 +1,134 @@
+version: '3.8'
+
 services:
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile.dev
+    container_name: library_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./static:/app/static:ro
+    depends_on:
+      - web
+    networks:
+      - library_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   web:
     build: .
     container_name: library_web
-    ports:
-      - "80:5000"
+    expose:
+      - "5000"
     volumes:
       - .:/app
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
     command: ["flask", "run", "--host=0.0.0.0"]
     env_file:
       - .env
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - library_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    environment:
+      - PYTHONUNBUFFERED=1
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+      - /var/tmp
 
   db:
     image: mysql:8.0
     container_name: library_db
     environment:
-      - MYSQL_ROOT_PASSWORD=password
-      - MYSQL_DATABASE=library_dev
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
     volumes:
       - db-data:/var/lib/mysql
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    ports:
-      - "3306:3306"
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./mysql/conf.d:/etc/mysql/conf.d:ro
+    expose:
+      - "3306"
     healthcheck:
-      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
     networks:
       - library_network
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  # 開発用メールサーバー（オプション）
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: library_mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - library_network
+    restart: unless-stopped
+    profiles:
+      - dev
+
+  # Redis（レート制限用）
+  redis:
+    image: redis:7-alpine
+    container_name: library_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - library_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis123}
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   db-data:
-    name: db-data
+    name: library-db-data
+    driver: local
+  redis-data:
+    name: library-redis-data
+    driver: local
 
 networks:
   library_network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16

@@ -1,0 +1,46 @@
+[mysqld]
+# 基本設定
+default-authentication-plugin=mysql_native_password
+character-set-server=utf8mb4
+collation-server=utf8mb4_unicode_ci
+
+# セキュリティ設定
+local_infile=0
+skip_symbolic_links=1
+secure_file_priv=/var/lib/mysql-files
+
+# 接続制限
+max_connections=200
+max_connect_errors=10
+connect_timeout=10
+wait_timeout=28800
+interactive_timeout=28800
+
+# ログ設定
+log_error=/var/log/mysql/error.log
+slow_query_log=1
+slow_query_log_file=/var/log/mysql/slow.log
+long_query_time=2
+
+# パフォーマンス設定
+innodb_buffer_pool_size=256M
+innodb_log_file_size=64M
+innodb_flush_log_at_trx_commit=1
+innodb_file_per_table=1
+
+# バイナリログ設定（バックアップ用）
+log_bin=mysql-bin
+binlog_format=ROW
+expire_logs_days=7
+max_binlog_size=100M
+
+# レプリケーション設定（必要に応じて）
+# server-id=1
+# log_bin=mysql-bin
+# binlog_format=ROW
+
+[mysql]
+default-character-set=utf8mb4
+
+[client]
+default-character-set=utf8mb4 

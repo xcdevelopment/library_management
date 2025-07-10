@@ -1,12 +1,34 @@
-from flask import Blueprint, render_template, request
+from flask import Blueprint, render_template, request, jsonify
 from flask_wtf import FlaskForm
 from flask_login import login_required, current_user
 from datetime import datetime, timedelta
-from sqlalchemy import func, desc, and_
+from sqlalchemy import func, desc, and_, text
 from models import db, LoanHistory, Book, Reservation, User, BookStatus, Announcement, ReservationStatus
 from services.book_service import get_popular_books
 
 home_bp = Blueprint('home', __name__)
+
+@home_bp.route('/health')
+def health_check():
+    """ヘルスチェックエンドポイント"""
+    try:
+        # データベース接続テスト
+        db.session.execute(text('SELECT 1'))
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.utcnow().isoformat(),
+            'database': 'connected',
+            'version': '1.0.0'
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'timestamp': datetime.utcnow().isoformat(),
+            'database': 'disconnected',
+            'error': str(e)
+        }), 503
 
 @home_bp.route('/')
 @login_required
