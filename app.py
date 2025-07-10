@@ -90,8 +90,7 @@ def reset_admin_password_command():
         log = OperationLog(
             user_id=admin_user.id,
             action='admin_password_reset',
-            target=f'User: {admin_user.email}',
-            details='Admin password reset via CLI command.',
+            target=f'User: {admin_user.email} - CLI command',
             ip_address='localhost' # CLIからの実行を示す
         )
         db.session.add(log)
@@ -100,6 +99,134 @@ def reset_admin_password_command():
     except Exception as e:
         db.session.rollback()
         print(f"Error resetting admin password for {admin_email}: {e}")
+
+@click.command('create-admin')
+@click.option('--email', prompt='管理者のメールアドレス', help='管理者のメールアドレス')
+@click.option('--name', prompt='管理者の名前', help='管理者の名前')
+@click.option('--password', prompt='パスワード', hide_input=True, confirmation_prompt=True, help='管理者のパスワード')
+@with_appcontext
+def create_admin_command(email, name, password):
+    """新しい管理者ユーザーを作成します。"""
+    # 既存ユーザーの確認
+    existing_user = User.query.filter_by(email=email).first()
+    if existing_user:
+        print(f"Error: User with email '{email}' already exists.")
+        return
+
+    try:
+        # 新しい管理者ユーザーを作成
+        admin = User(
+            email=email,
+            name=name,
+            is_admin=True
+        )
+        admin.set_password(password)
+        db.session.add(admin)
+        db.session.commit()
+        
+        print(f"✅ 管理者ユーザー '{email}' が正常に作成されました。")
+        
+        # 操作ログの記録
+        log = OperationLog(
+            user_id=admin.id,
+            action='admin_created',
+            target=f'User: {admin.email} (Name: {admin.name}) - CLI command',
+            ip_address='localhost' # CLIからの実行を示す
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ 管理者ユーザーの作成中にエラーが発生しました: {e}")
+
+@click.command('list-users')
+@click.option('--admin-only', is_flag=True, help='管理者ユーザーのみを表示')
+@with_appcontext
+def list_users_command(admin_only):
+    """ユーザー一覧を表示します。"""
+    try:
+        if admin_only:
+            users = User.query.filter_by(is_admin=True).all()
+            print("📋 管理者ユーザー一覧:")
+        else:
+            users = User.query.all()
+            print("📋 全ユーザー一覧:")
+        
+        if not users:
+            print("  ユーザーが見つかりません。")
+            return
+        
+        for user in users:
+            admin_status = "👑 管理者" if user.is_admin else "👤 一般"
+            print(f"  {admin_status} | {user.email} | {user.name}")
+            
+    except Exception as e:
+        print(f"❌ ユーザー一覧の取得中にエラーが発生しました: {e}")
+
+@click.command('delete-user')
+@click.option('--email', prompt='削除するユーザーのメールアドレス', help='削除するユーザーのメールアドレス')
+@click.option('--force', is_flag=True, help='確認なしで削除を実行')
+@with_appcontext
+def delete_user_command(email, force):
+    """指定されたユーザーを削除します。"""
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        print(f"❌ メールアドレス '{email}' のユーザーが見つかりません。")
+        return
+    
+    if not force:
+        confirm = input(f"⚠️  ユーザー '{email}' ({user.name}) を削除しますか？ (y/N): ")
+        if confirm.lower() != 'y':
+            print("❌ 削除をキャンセルしました。")
+            return
+    
+    try:
+        # 操作ログの記録（削除前に実行）
+        log = OperationLog(
+            user_id=user.id,
+            action='user_deleted',
+            target=f'User: {user.email} (Name: {user.name}) - CLI command',
+            ip_address='localhost'
+        )
+        db.session.add(log)
+        
+        # ユーザーを削除
+        db.session.delete(user)
+        db.session.commit()
+        
+        print(f"✅ ユーザー '{email}' が正常に削除されました。")
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ ユーザーの削除中にエラーが発生しました: {e}")
+
+@click.command('db-status')
+@with_appcontext
+def db_status_command():
+    """データベースの状態を確認します。"""
+    try:
+        from sqlalchemy import text
+        
+        # 接続テスト
+        result = db.session.execute(text('SELECT 1'))
+        print("✅ データベース接続: 正常")
+        
+        # ユーザー数
+        user_count = User.query.count()
+        admin_count = User.query.filter_by(is_admin=True).count()
+        print(f"📊 ユーザー統計:")
+        print(f"  総ユーザー数: {user_count}")
+        print(f"  管理者数: {admin_count}")
+        print(f"  一般ユーザー数: {user_count - admin_count}")
+        
+        # テーブル一覧
+        result = db.session.execute(text("SHOW TABLES"))
+        tables = [row[0] for row in result]
+        print(f"🗄️  テーブル一覧: {', '.join(tables)}")
+        
+    except Exception as e:
+        print(f"❌ データベース状態の確認中にエラーが発生しました: {e}")
 
 def create_admin(app):
     with app.app_context():
@@ -274,13 +401,46 @@ def create_app(config_name=None):
     # カスタムCLIコマンドの登録
     app.cli.add_command(init_db_command)
     app.cli.add_command(reset_admin_password_command)
+    app.cli.add_command(create_admin_command)
+    app.cli.add_command(list_users_command)
+    app.cli.add_command(delete_user_command)
+    app.cli.add_command(db_status_command)
 
     # レート制限の設定
-    limiter = Limiter(
-        app=app,
-        key_func=get_remote_address,
-        default_limits=["200 per day", "50 per hour"]
-    )
+    try:
+        if is_production:
+            # 本番環境ではRedisを使用
+            import redis
+            redis_client = redis.Redis(
+                host=os.environ.get('REDIS_HOST', 'localhost'),
+                port=int(os.environ.get('REDIS_PORT', 6379)),
+                db=0,
+                decode_responses=True
+            )
+            limiter = Limiter(
+                app=app,
+                key_func=get_remote_address,
+                default_limits=["200 per day", "50 per hour"],
+                storage_uri="redis://{}:{}".format(
+                    os.environ.get('REDIS_HOST', 'localhost'),
+                    os.environ.get('REDIS_PORT', 6379)
+                )
+            )
+        else:
+            # 開発環境ではメモリストレージを使用（警告を抑制）
+            limiter = Limiter(
+                app=app,
+                key_func=get_remote_address,
+                default_limits=["200 per day", "50 per hour"]
+            )
+    except Exception as e:
+        # Redis接続に失敗した場合はメモリストレージにフォールバック
+        print(f"Warning: Redis connection failed, using memory storage: {e}")
+        limiter = Limiter(
+            app=app,
+            key_func=get_remote_address,
+            default_limits=["200 per day", "50 per hour"]
+        )
     
     
     @app.errorhandler(404)
