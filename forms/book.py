@@ -70,4 +70,32 @@ class BookForm(FlaskForm):
     ], validators=[DataRequired()])
     category2 = SelectField('第２分類', choices=[('', '選択してください')])
     keywords = StringField('キーワード')
-    location = SelectField('配置場所', choices=[]) 
+    location = SelectField('配置場所', choices=[])
+    
+    def populate_location_choices(self):
+        """場所の選択肢を設定"""
+        try:
+            mappings = CategoryLocationMapping.query.all()
+            locations = set()
+            for mapping in mappings:
+                if mapping.default_location:
+                    locations.add(mapping.default_location)
+            
+            # デフォルトの場所も追加
+            default_locations = ['A棚-1', 'A棚-2', 'B棚-1', 'B棚-2', 'C棚-1', 'C棚-2']
+            locations.update(default_locations)
+            
+            self.location.choices = [('', '選択してください')] + [(loc, loc) for loc in sorted(locations)]
+        except Exception:
+            # エラーが発生した場合はデフォルトの選択肢を使用
+            self.location.choices = [('', '選択してください'), ('A棚-1', 'A棚-1'), ('A棚-2', 'A棚-2')]
+    
+    def populate_category2_choices(self, category1):
+        """第2分類の選択肢を設定"""
+        try:
+            if category1 and category1 in CATEGORIES:
+                self.category2.choices = [('', '選択してください')] + CATEGORIES[category1]
+            else:
+                self.category2.choices = [('', '選択してください')]
+        except Exception:
+            self.category2.choices = [('', '選択してください')] 
